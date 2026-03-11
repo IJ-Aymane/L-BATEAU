@@ -1,6 +1,7 @@
 import axios from 'axios';
 
-const BASE = 'http://localhost:8080/api';
+// ON FORCE L'URL DE RENDER ICI
+const BASE = 'https://bateau-backend.onrender.com/api';
 
 export const bateauxAPI = {
   getAll: () => axios.get(`${BASE}/bateaux`),
