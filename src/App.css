@@ -204,33 +204,101 @@ body {
   border-bottom: 1px solid var(--border);
   align-items: center;
   justify-content: space-between;
-  padding: 0 16px;
+  padding: 0 14px;
   z-index: 200;
+  gap: 12px;
 }
 
-.topbar-brand {
-  font-family: var(--font-display);
-  font-size: 20px;
-  letter-spacing: 3px;
-  color: var(--accent);
+@media (max-width: 768px) {
+  .topbar { display: flex; }
 }
 
+/* Hamburger button */
 .topbar-menu-btn {
   background: none;
   border: none;
-  color: var(--text);
-  font-size: 22px;
   cursor: pointer;
-  padding: 6px;
-  border-radius: 6px;
+  padding: 8px;
+  border-radius: 8px;
   transition: background var(--t);
   -webkit-tap-highlight-color: transparent;
+  flex-shrink: 0;
 }
 
 .topbar-menu-btn:hover { background: var(--border); }
 
+.hamburger-icon {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  width: 22px;
+}
+
+.hamburger-icon span {
+  display: block;
+  height: 2px;
+  background: var(--text);
+  border-radius: 2px;
+  transition: all var(--t);
+}
+
+/* Brand center */
+.topbar-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  justify-content: center;
+}
+
+.topbar-brand-icon { font-size: 18px; }
+
+.topbar-brand-name {
+  font-family: var(--font-display);
+  font-size: 20px;
+  letter-spacing: 3px;
+  color: var(--accent);
+  line-height: 1;
+}
+
+/* Current page icon — right side */
+.topbar-page {
+  font-size: 20px;
+  flex-shrink: 0;
+  width: 38px;
+  text-align: center;
+}
+
+/* Sidebar close button — mobile only */
+.sidebar-close-btn {
+  display: none;
+}
+
 @media (max-width: 768px) {
-  .topbar { display: flex; }
+  .sidebar-close-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: absolute;
+    top: 14px;
+    right: 14px;
+    background: var(--border);
+    border: none;
+    color: var(--muted);
+    font-size: 14px;
+    width: 30px;
+    height: 30px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background var(--t), color var(--t);
+    -webkit-tap-highlight-color: transparent;
+    z-index: 10;
+  }
+
+  .sidebar-close-btn:hover {
+    background: rgba(239,68,68,0.15);
+    color: var(--red);
+  }
 }
 
 /* ============================================================
@@ -248,8 +316,48 @@ body {
 @media (max-width: 768px) {
   .main-content {
     margin-left: 0;
-    padding: 72px 14px 24px; /* top: topbar height + gap */
+    padding: 80px 14px 32px; /* 56px topbar + 24px gap */
+    width: 100%;
   }
+}
+
+/* ============================================================
+   MOBILE PAGE HEADER — sticky section header inside main-content
+   ============================================================ */
+
+.mobile-page-header {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .mobile-page-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 56px; /* just below topbar */
+    z-index: 150;
+    background: var(--deep);
+    border-bottom: 1px solid var(--border);
+    padding: 12px 14px;
+    margin: -80px -14px 20px -14px; /* bleed to edges, push content down */
+    padding-top: 12px;
+  }
+
+  .mobile-page-header .page-title {
+    font-size: 22px;
+    letter-spacing: 3px;
+  }
+
+  .mobile-page-header .page-subtitle {
+    font-size: 11px;
+    margin-top: 2px;
+  }
+}
+
+/* On desktop: keep original page-header behavior, hide mobile one */
+@media (min-width: 769px) {
+  .mobile-page-header { display: none; }
 }
 
 /* ============================================================
@@ -587,15 +695,16 @@ td:last-child { white-space: nowrap; }
   margin-bottom: 28px;
 }
 
-@media (max-width: 768px) {
+@media (max-width: 600px) {
   .stats-grid {
     grid-template-columns: 1fr;
-    gap: 12px;
+    gap: 10px;
+    margin-bottom: 20px;
   }
 }
 
-@media (min-width: 480px) and (max-width: 768px) {
-  .stats-grid { grid-template-columns: repeat(2, 1fr); }
+@media (min-width: 601px) and (max-width: 768px) {
+  .stats-grid { grid-template-columns: repeat(2, 1fr); gap: 12px; }
 }
 
 .stat-card {
@@ -641,14 +750,15 @@ td:last-child { white-space: nowrap; }
   gap: 10px;
 }
 
-@media (max-width: 480px) {
-  .info-grid { grid-template-columns: 1fr; }
+@media (max-width: 600px) {
+  .info-grid { grid-template-columns: 1fr; gap: 8px; }
 }
 
 .info-item {
   background: var(--deep);
   border-radius: 8px;
   padding: 12px 14px;
+  min-width: 0; /* prevent overflow */
 }
 
 .info-item-label {
@@ -664,7 +774,162 @@ td:last-child { white-space: nowrap; }
   color: var(--accent);
   font-family: monospace;
   word-break: break-all;
+  overflow-wrap: break-word;
 }
+
+/* ============================================================
+   RESPONSIVE VISIBILITY
+   ============================================================ */
+
+.desktop-only { display: block !important; }
+.mobile-only  { display: none !important;  }
+
+@media (max-width: 768px) {
+  .desktop-only { display: none !important;  }
+  .mobile-only  { display: block !important; }
+}
+
+/* ============================================================
+   MOBILE CARD LIST — accordion style
+   ============================================================ */
+
+.mobile-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.mobile-card {
+  border-bottom: 1px solid var(--border);
+  overflow: hidden;
+  transition: background var(--t);
+}
+
+.mobile-card:last-child { border-bottom: none; }
+
+/* Colored left border accent per status */
+.mobile-card.accent-blue   { border-left: 3px solid var(--accent); }
+.mobile-card.accent-green  { border-left: 3px solid var(--green);  }
+.mobile-card.accent-gold   { border-left: 3px solid var(--gold);   }
+.mobile-card.accent-red    { border-left: 3px solid var(--red);    }
+
+/* ── Summary row (always visible) ── */
+.mc-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 14px 14px 16px;
+  cursor: pointer;
+  gap: 10px;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+
+.mc-summary:active { background: rgba(14,165,233,0.05); }
+
+.mc-summary-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  flex: 1;
+}
+
+.mc-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mc-summary-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+/* Arrow chevron */
+.mc-chevron {
+  font-size: 11px;
+  color: var(--muted);
+  transition: transform 0.25s cubic-bezier(.4,0,.2,1);
+  display: inline-block;
+  line-height: 1;
+}
+
+.mobile-card.open .mc-chevron {
+  transform: rotate(180deg);
+}
+
+/* ── Expanded body ── */
+.mc-body {
+  display: none;
+  flex-direction: column;
+  gap: 0;
+  background: rgba(0,0,0,0.15);
+  border-top: 1px solid var(--border);
+}
+
+.mobile-card.open .mc-body {
+  display: flex;
+}
+
+.mc-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 9px 16px;
+  border-bottom: 1px solid rgba(26,45,69,0.4);
+}
+
+.mc-row:last-child { border-bottom: none; }
+
+.mc-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--muted);
+  font-weight: 500;
+  flex-shrink: 0;
+  margin-right: 8px;
+}
+
+.mc-value {
+  font-size: 13px;
+  color: var(--text);
+  text-align: right;
+  word-break: break-word;
+}
+
+/* Action row inside expanded */
+.mc-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  border-top: 1px solid var(--border);
+}
+
+.mc-actions .btn {
+  border-radius: 0;
+  padding: 12px 8px;
+  font-size: 13px;
+  justify-content: center;
+  border: none;
+  background: transparent;
+}
+
+.mc-actions .btn:first-child {
+  border-right: 1px solid var(--border);
+  color: var(--accent);
+}
+.mc-actions .btn:first-child:hover { background: rgba(14,165,233,0.08); }
+.mc-actions .btn:last-child  { color: var(--red); }
+.mc-actions .btn:last-child:hover  { background: rgba(239,68,68,0.08); }
+
+/* Divider — kept for compatibility */
+.mc-divider { display: none; }
 
 /* ============================================================
    SECTION TITLE

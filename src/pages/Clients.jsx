@@ -4,77 +4,52 @@ import { clientsAPI, reservationsAPI, bateauxAPI } from '../api';
 const EMPTY = { nomComplet: '', telephone: '', cin: '' };
 
 export default function Clients() {
-  const [list, setList] = useState([]);
-  const [reservations, setReservations] = useState([]);
-  const [bateaux, setBateaux] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [modal, setModal] = useState(false);
-  const [form, setForm] = useState(EMPTY);
-  const [editId, setEditId] = useState(null);
+  const [list, setList]             = useState([]);
+  const [reservations, setRes]      = useState([]);
+  const [bateaux, setBateaux]       = useState([]);
+  const [loading, setLoading]       = useState(true);
+  const [error, setError]           = useState('');
+  const [modal, setModal]           = useState(false);
+  const [form, setForm]             = useState(EMPTY);
+  const [editId, setEditId]         = useState(null);
+  const [openId, setOpenId]         = useState(null);
 
   const load = () => {
     setLoading(true);
     Promise.all([clientsAPI.getAll(), reservationsAPI.getAll(), bateauxAPI.getAll()])
-      .then(([clientsRes, reservationsRes, bateauxRes]) => {
-        setList(clientsRes.data);
-        setReservations(reservationsRes.data);
-        setBateaux(bateauxRes.data);
-      })
+      .then(([c, r, b]) => { setList(c.data); setRes(r.data); setBateaux(b.data); })
       .catch(() => setError('Erreur de chargement'))
       .finally(() => setLoading(false));
   };
 
   useEffect(() => { load(); }, []);
 
-  const openCreate = () => { setForm(EMPTY); setEditId(null); setModal(true); setError(''); };
-  const openEdit = (c) => { setForm(c); setEditId(c.id); setModal(true); setError(''); };
+  const toggle     = (id) => setOpenId(prev => prev === id ? null : id);
+  const openCreate = ()   => { setForm(EMPTY); setEditId(null); setModal(true); setError(''); };
+  const openEdit   = (c)  => { setForm(c); setEditId(c.id); setModal(true); setError(''); };
 
   const save = async () => {
     try {
       if (editId) await clientsAPI.update(editId, form);
-      else await clientsAPI.create(form);
-      setModal(false); 
-      load();
+      else        await clientsAPI.create(form);
+      setModal(false); load();
     } catch { setError('Erreur lors de la sauvegarde'); }
   };
 
   const del = async (id) => {
     if (!window.confirm('Supprimer ce client ?')) return;
-    await clientsAPI.delete(id); 
-    load();
+    await clientsAPI.delete(id); load();
   };
 
-  // Finances et bateaux du client
-  const getClientFinances = (clientId) => {
-    const clientRes = reservations.filter(r => r.clientId === clientId);
-    return clientRes.reduce((acc, curr) => ({
-      total: acc.total + (curr.montantTotal || 0),
-      paye: acc.paye + (curr.montantPaye || 0),
-      restant: acc.restant + (curr.montantRestant || 0)
-    }), { total: 0, paye: 0, restant: 0 });
-  };
-
-  const getClientBateaux = (clientId) => {
-    const clientRes = reservations.filter(r => r.clientId === clientId);
-    const noms = clientRes.map(r => {
-      const b = bateaux.find(b => b.id === r.bateauId);
-      return b ? b.nom : '—';
-    });
-    // Uniq noms
-    return [...new Set(noms)];
-  };
-
-  const getClientSummary = (clientId) => {
-    const clientRes = reservations.filter(r => r.clientId === clientId);
-    const bateauxDiff = getClientBateaux(clientId);
-    const finances = getClientFinances(clientId);
+  const getStats = (clientId) => {
+    const res = reservations.filter(r => r.clientId === clientId);
+    const bateauxNoms = [...new Set(res.map(r => bateaux.find(b => b.id === r.bateauId)?.nom).filter(Boolean))];
     return {
-      nbReservations: clientRes.length,
-      nbBateaux: bateauxDiff.length,
-      total: finances.total,
-      paye: finances.paye,
-      restant: finances.restant
+      nbRes: res.length,
+      bateauxNoms,
+      total:   res.reduce((a, r) => a + (r.montantTotal   || 0), 0),
+      paye:    res.reduce((a, r) => a + (r.montantPaye    || 0), 0),
+      restant: res.reduce((a, r) => a + (r.montantRestant || 0), 0),
     };
   };
 
@@ -89,51 +64,40 @@ export default function Clients() {
       </div>
 
       <div className="card">
-        {loading ? <div className="loading">Chargement...</div> : (
-          <div className="table-wrap">
-            {list.length === 0 ? (
-              <div className="empty-state"><div className="empty-icon">👤</div><p>Aucun client enregistré</p></div>
-            ) : (
+        {loading ? (
+          <div className="loading">Chargement...</div>
+        ) : list.length === 0 ? (
+          <div className="empty-state"><div className="empty-icon">👤</div><p>Aucun client enregistré</p></div>
+        ) : (
+          <>
+            {/* DESKTOP TABLE */}
+            <div className="table-wrap desktop-only">
               <table>
                 <thead>
                   <tr>
-                    <th>Nom Complet</th>
-                    <th>Téléphone</th>
-                    <th>CIN</th>
-                    <th>Bateaux</th>
-                    <th>Nb Réservations</th>
-                    <th>Nb Bateaux</th>
-                    <th>Montant Total</th>
-                    <th>Avance</th>
-                    <th>Reste</th>
-                    <th>État</th>
-                    <th>Actions</th>
+                    <th>Nom</th><th>Téléphone</th><th>CIN</th><th>Bateaux</th>
+                    <th>Réservations</th><th>Total</th><th>Avance</th><th>Reste</th><th>État</th><th>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {list.map(c => {
-                    const finances = getClientFinances(c.id);
-                    const bateauxClient = getClientBateaux(c.id);
-                    const summary = getClientSummary(c.id);
-
-                    let etatBadge = <span className="badge badge-blue">Aucune résa</span>;
-                    if (finances.total > 0) {
-                      if (finances.restant <= 0) etatBadge = <span className="badge badge-green">✅ Payé</span>;
-                      else etatBadge = <span className="badge badge-gold">⚠️ Reste à payer</span>;
-                    }
-
+                    const s = getStats(c.id);
+                    const etat = s.total === 0
+                      ? <span className="badge badge-blue">Aucune résa</span>
+                      : s.restant <= 0
+                        ? <span className="badge badge-green">✅ Payé</span>
+                        : <span className="badge badge-gold">⚠️ Reste</span>;
                     return (
                       <tr key={c.id}>
                         <td><strong>{c.nomComplet || '—'}</strong></td>
                         <td>{c.telephone}</td>
-                        <td style={{ fontFamily: 'monospace', fontSize: '13px' }}>{c.cin || '—'}</td>
-                        <td>{bateauxClient.join(', ') || '—'}</td>
-                        <td>{summary.nbReservations}</td>
-                        <td>{summary.nbBateaux}</td>
-                        <td style={{ fontWeight: 500 }}>{summary.total} MAD</td>
-                        <td style={{ color: 'var(--green)', fontWeight: 500 }}>{summary.paye} MAD</td>
-                        <td style={{ color: summary.restant > 0 ? 'var(--gold)' : 'var(--muted)', fontWeight: 'bold' }}>{summary.restant} MAD</td>
-                        <td>{etatBadge}</td>
+                        <td className="font-mono fs-sm">{c.cin || '—'}</td>
+                        <td>{s.bateauxNoms.join(', ') || '—'}</td>
+                        <td>{s.nbRes}</td>
+                        <td className="fw-500">{s.total} MAD</td>
+                        <td className="text-green fw-500">{s.paye} MAD</td>
+                        <td className={s.restant > 0 ? 'text-gold fw-bold' : 'text-muted'}>{s.restant} MAD</td>
+                        <td>{etat}</td>
                         <td>
                           <div style={{ display: 'flex', gap: '8px' }}>
                             <button className="btn btn-ghost btn-sm" onClick={() => openEdit(c)}>✏️</button>
@@ -145,8 +109,57 @@ export default function Clients() {
                   })}
                 </tbody>
               </table>
-            )}
-          </div>
+            </div>
+
+            {/* MOBILE ACCORDION */}
+            <div className="mobile-only mobile-list">
+              {list.map(c => {
+                const s = getStats(c.id);
+                const isPaid  = s.total > 0 && s.restant <= 0;
+                const hasDebt = s.restant > 0;
+                const accentCls = isPaid ? 'accent-green' : hasDebt ? 'accent-gold' : 'accent-blue';
+                const isOpen = openId === c.id;
+
+                return (
+                  <div key={c.id} className={`mobile-card ${accentCls} ${isOpen ? 'open' : ''}`}>
+
+                    <div className="mc-summary" onClick={() => toggle(c.id)}>
+                      <div className="mc-summary-left">
+                        <span className="mc-name">👤 {c.nomComplet || '—'}</span>
+                      </div>
+                      <div className="mc-summary-right">
+                        {s.total === 0
+                          ? <span className="badge badge-blue">Aucune résa</span>
+                          : isPaid
+                            ? <span className="badge badge-green">✅ Payé</span>
+                            : <span className="badge badge-gold">⚠️ Reste</span>
+                        }
+                        <span className="mc-chevron">▼</span>
+                      </div>
+                    </div>
+
+                    <div className="mc-body">
+                      <div className="mc-row"><span className="mc-label">Téléphone</span><span className="mc-value">{c.telephone || '—'}</span></div>
+                      <div className="mc-row"><span className="mc-label">CIN</span><span className="mc-value font-mono">{c.cin || '—'}</span></div>
+                      <div className="mc-row"><span className="mc-label">Réservations</span><span className="mc-value">{s.nbRes}</span></div>
+                      <div className="mc-row"><span className="mc-label">Bateaux</span><span className="mc-value">{s.bateauxNoms.join(', ') || '—'}</span></div>
+                      <div className="mc-row"><span className="mc-label">Total</span><span className="mc-value fw-500">{s.total} MAD</span></div>
+                      <div className="mc-row"><span className="mc-label">Avance</span><span className="mc-value text-green fw-500">{s.paye} MAD</span></div>
+                      <div className="mc-row">
+                        <span className="mc-label">Reste</span>
+                        <span className={`mc-value fw-bold ${s.restant > 0 ? 'text-gold' : 'text-muted'}`}>{s.restant} MAD</span>
+                      </div>
+                      <div className="mc-actions">
+                        <button className="btn" onClick={() => openEdit(c)}>✏️ Modifier</button>
+                        <button className="btn" onClick={() => del(c.id)}>🗑️ Supprimer</button>
+                      </div>
+                    </div>
+
+                  </div>
+                );
+              })}
+            </div>
+          </>
         )}
       </div>
 
@@ -155,18 +168,9 @@ export default function Clients() {
           <div className="modal">
             <div className="modal-title">{editId ? 'MODIFIER CLIENT' : 'NOUVEAU CLIENT'}</div>
             {error && <div className="error-msg">{error}</div>}
-            <div className="form-group">
-              <label>Nom Complet</label>
-              <input value={form.nomComplet || ''} onChange={e => setForm(p => ({ ...p, nomComplet: e.target.value }))} />
-            </div>
-            <div className="form-group">
-              <label>Téléphone</label>
-              <input value={form.telephone || ''} onChange={e => setForm(p => ({ ...p, telephone: e.target.value }))} />
-            </div>
-            <div className="form-group">
-              <label>CIN</label>
-              <input value={form.cin || ''} onChange={e => setForm(p => ({ ...p, cin: e.target.value }))} />
-            </div>
+            <div className="form-group"><label>Nom Complet</label><input value={form.nomComplet || ''} onChange={e => setForm(p => ({ ...p, nomComplet: e.target.value }))} /></div>
+            <div className="form-group"><label>Téléphone</label><input value={form.telephone || ''} onChange={e => setForm(p => ({ ...p, telephone: e.target.value }))} /></div>
+            <div className="form-group"><label>CIN</label><input value={form.cin || ''} onChange={e => setForm(p => ({ ...p, cin: e.target.value }))} /></div>
             <div className="modal-actions">
               <button className="btn btn-ghost" onClick={() => setModal(false)}>Annuler</button>
               <button className="btn btn-primary" onClick={save}>💾 Sauvegarder</button>
