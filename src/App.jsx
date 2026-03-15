@@ -1,19 +1,24 @@
 import { useState, useEffect } from 'react';
 import { Routes, Route, NavLink, useLocation, useNavigate, Navigate } from 'react-router-dom';
-import Bateaux      from './pages/Bateaux';
-import Clients      from './pages/Clients';
-import Reservations from './pages/Reservations';
-import Dashboard    from './pages/Dashboard';
-import Login        from './pages/Login';
-import PrivateRoute from './components/PrivateRoute';
+import Bateaux        from './pages/Bateaux';
+import Clients        from './pages/Clients';
+import Reservations   from './pages/Reservations';
+import Dashboard      from './pages/Dashboard';
+import Login          from './pages/Login';
+import ForgotPassword from './pages/ForgotPassword';
+import ResetPassword  from './pages/ResetPassword';
+import PrivateRoute   from './components/PrivateRoute';
 import './App.css';
+
+const PUBLIC_ROUTES = ['/login', '/forgot-password', '/reset-password'];
 
 export default function App() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const location = useLocation();
-  const navigate = useNavigate();
+  const location  = useLocation();
+  const navigate  = useNavigate();
 
-  const isLoggedIn = !!localStorage.getItem('jwt_token');
+  const isLoggedIn  = !!localStorage.getItem('jwt_token');
+  const isPublicPage = PUBLIC_ROUTES.includes(location.pathname);
 
   useEffect(() => { setSidebarOpen(false); }, [location.pathname]);
   useEffect(() => {
@@ -37,12 +42,14 @@ export default function App() {
     n.to === '/' ? location.pathname === '/' : location.pathname.startsWith(n.to)
   );
 
-  // Don't show layout on login page
-  if (location.pathname === '/login') {
+  // Public pages — no layout
+  if (isPublicPage) {
     return (
       <Routes>
-        <Route path="/login" element={<Login />} />
-        <Route path="*" element={<Navigate to="/login" replace />} />
+        <Route path="/login"           element={<Login />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password"  element={<ResetPassword />} />
+        <Route path="*"                element={<Navigate to="/login" replace />} />
       </Routes>
     );
   }
@@ -68,7 +75,7 @@ export default function App() {
 
       {/* ── SIDEBAR ───────────────────────────────────────── */}
       <aside className={`sidebar ${sidebarOpen ? 'open' : ''}`}>
-        <button className="sidebar-close-btn" onClick={() => setSidebarOpen(false)} aria-label="Fermer le menu">✕</button>
+        <button className="sidebar-close-btn" onClick={() => setSidebarOpen(false)}>✕</button>
 
         <div className="sidebar-brand">
           <span className="brand-icon">⚓</span>
@@ -99,11 +106,7 @@ export default function App() {
               <span>API Connected</span>
             </div>
             {isLoggedIn && (
-              <button
-                onClick={logout}
-                className="btn btn-danger btn-sm"
-                style={{ width: '100%' }}
-              >
+              <button onClick={logout} className="btn btn-danger btn-sm" style={{ width: '100%' }}>
                 🚪 Déconnexion
               </button>
             )}
@@ -114,7 +117,6 @@ export default function App() {
       {/* ── MAIN CONTENT ──────────────────────────────────── */}
       <main className="main-content">
         <Routes>
-          <Route path="/login" element={<Login />} />
           <Route path="/"             element={<PrivateRoute><Dashboard /></PrivateRoute>} />
           <Route path="/bateaux"      element={<PrivateRoute><Bateaux /></PrivateRoute>} />
           <Route path="/clients"      element={<PrivateRoute><Clients /></PrivateRoute>} />

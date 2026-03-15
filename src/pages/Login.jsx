@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { authAPI } from '../api';
 
 export default function Login() {
@@ -28,6 +28,7 @@ export default function Login() {
   return (
     <div className="login-page">
       <div className="login-card">
+
         <div className="login-brand">
           <span className="login-brand-icon">⚓</span>
           <div className="login-brand-name">L'BATEAU</div>
@@ -45,6 +46,7 @@ export default function Login() {
               onChange={e => setUsername(e.target.value)}
               placeholder="admin"
               autoFocus
+              autoComplete="username"
             />
           </div>
 
@@ -55,6 +57,7 @@ export default function Login() {
               value={password}
               onChange={e => setPassword(e.target.value)}
               placeholder="••••••••"
+              autoComplete="current-password"
             />
           </div>
 
@@ -62,11 +65,29 @@ export default function Login() {
             className="btn btn-primary"
             type="submit"
             disabled={loading}
-            style={{ width: '100%', marginTop: '8px' }}
+            style={{ width: '100%', marginTop: '4px' }}
           >
             {loading ? 'Connexion...' : 'Se connecter'}
           </button>
+
+          {/* Forgot password link */}
+          <div style={{ textAlign: 'center', marginTop: '8px' }}>
+            <Link
+              to="/forgot-password"
+              style={{
+                fontSize: '12px',
+                color: 'var(--muted)',
+                textDecoration: 'none',
+                letterSpacing: '0.3px',
+              }}
+              onMouseOver={e => e.target.style.color = 'var(--accent)'}
+              onMouseOut={e => e.target.style.color = 'var(--muted)'}
+            >
+              Mot de passe oublié ?
+            </Link>
+          </div>
         </form>
+
       </div>
     </div>
   );

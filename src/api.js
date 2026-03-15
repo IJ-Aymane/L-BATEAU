@@ -2,6 +2,7 @@ import axios from 'axios';
 
 const BASE = 'https://l-bateau-back.onrender.com/api';
 
+// ── Authenticated instance ────────────────────────────────────
 const api = axios.create({ baseURL: BASE });
 
 api.interceptors.request.use(config => {
@@ -21,11 +22,19 @@ api.interceptors.response.use(
   }
 );
 
+// ── Auth (public endpoints — no token needed) ─────────────────
 export const authAPI = {
   login: (username, password) =>
     axios.post(`${BASE}/auth/login`, { username, password }),
+
+  forgotPassword: (emailOrPhone) =>
+    axios.post(`${BASE}/auth/forgot-password`, { emailOrPhone }),
+
+  resetPassword: (code, newPassword) =>
+    axios.post(`${BASE}/auth/reset-password`, { code, newPassword }),
 };
 
+// ── Resources ─────────────────────────────────────────────────
 export const bateauxAPI = {
   getAll:  ()        => api.get(`/bateaux`),
   getById: (id)      => api.get(`/bateaux/${id}`),
@@ -43,10 +52,10 @@ export const clientsAPI = {
 };
 
 export const reservationsAPI = {
-  getAll:     ()           => api.get(`/reservations`),
-  getById:    (id)         => api.get(`/reservations/${id}`),
-  getByClient:(clientId)   => api.get(`/reservations/client/${clientId}`),
-  create:     (data)       => api.post(`/reservations`, data),
-  update:     (id,data)    => api.put(`/reservations/${id}`, data),
-  delete:     (id)         => api.delete(`/reservations/${id}`),
+  getAll:      ()          => api.get(`/reservations`),
+  getById:     (id)        => api.get(`/reservations/${id}`),
+  getByClient: (clientId)  => api.get(`/reservations/client/${clientId}`),
+  create:      (data)      => api.post(`/reservations`, data),
+  update:      (id,data)   => api.put(`/reservations/${id}`, data),
+  delete:      (id)        => api.delete(`/reservations/${id}`),
 };
