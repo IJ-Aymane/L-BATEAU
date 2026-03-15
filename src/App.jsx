@@ -1,25 +1,30 @@
 import { useState, useEffect } from 'react';
-import { Routes, Route, NavLink, useLocation } from 'react-router-dom';
-import Bateaux from './pages/Bateaux';
-import Clients from './pages/Clients';
+import { Routes, Route, NavLink, useLocation, useNavigate, Navigate } from 'react-router-dom';
+import Bateaux      from './pages/Bateaux';
+import Clients      from './pages/Clients';
 import Reservations from './pages/Reservations';
-import Dashboard from './pages/Dashboard';
+import Dashboard    from './pages/Dashboard';
+import Login        from './pages/Login';
+import PrivateRoute from './components/PrivateRoute';
 import './App.css';
 
 export default function App() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const location = useLocation();
+  const navigate = useNavigate();
 
-  // Close sidebar on route change (mobile)
-  useEffect(() => {
-    setSidebarOpen(false);
-  }, [location.pathname]);
+  const isLoggedIn = !!localStorage.getItem('jwt_token');
 
-  // Prevent body scroll when sidebar is open on mobile
+  useEffect(() => { setSidebarOpen(false); }, [location.pathname]);
   useEffect(() => {
     document.body.style.overflow = sidebarOpen ? 'hidden' : '';
     return () => { document.body.style.overflow = ''; };
   }, [sidebarOpen]);
+
+  const logout = () => {
+    localStorage.removeItem('jwt_token');
+    navigate('/login');
+  };
 
   const nav = [
     { to: '/',             label: 'Dashboard',   icon: '◈' },
@@ -29,57 +34,41 @@ export default function App() {
   ];
 
   const pageTitle = nav.find(n =>
-    n.to === '/'
-      ? location.pathname === '/'
-      : location.pathname.startsWith(n.to)
+    n.to === '/' ? location.pathname === '/' : location.pathname.startsWith(n.to)
   );
+
+  // Don't show layout on login page
+  if (location.pathname === '/login') {
+    return (
+      <Routes>
+        <Route path="/login" element={<Login />} />
+        <Route path="*" element={<Navigate to="/login" replace />} />
+      </Routes>
+    );
+  }
 
   return (
     <div className="app-layout">
 
       {/* ── MOBILE TOPBAR ─────────────────────────────────── */}
       <header className="topbar">
-        <button
-          className="topbar-menu-btn"
-          onClick={() => setSidebarOpen(true)}
-          aria-label="Ouvrir le menu"
-        >
-          <span className="hamburger-icon">
-            <span /><span /><span />
-          </span>
+        <button className="topbar-menu-btn" onClick={() => setSidebarOpen(true)} aria-label="Ouvrir le menu">
+          <span className="hamburger-icon"><span /><span /><span /></span>
         </button>
-
         <div className="topbar-brand">
           <span className="topbar-brand-icon">⚓</span>
           <span className="topbar-brand-name">L'BATEAU</span>
         </div>
-
-        {/* Current page indicator */}
-        <div className="topbar-page">
-          {pageTitle?.icon}
-        </div>
+        <div className="topbar-page">{pageTitle?.icon}</div>
       </header>
 
-      {/* ── SIDEBAR OVERLAY (mobile) ───────────────────────── */}
       {sidebarOpen && (
-        <div
-          className="sidebar-overlay"
-          onClick={() => setSidebarOpen(false)}
-          aria-hidden="true"
-        />
+        <div className="sidebar-overlay" onClick={() => setSidebarOpen(false)} aria-hidden="true" />
       )}
 
       {/* ── SIDEBAR ───────────────────────────────────────── */}
       <aside className={`sidebar ${sidebarOpen ? 'open' : ''}`}>
-
-        {/* Close button — mobile only */}
-        <button
-          className="sidebar-close-btn"
-          onClick={() => setSidebarOpen(false)}
-          aria-label="Fermer le menu"
-        >
-          ✕
-        </button>
+        <button className="sidebar-close-btn" onClick={() => setSidebarOpen(false)} aria-label="Fermer le menu">✕</button>
 
         <div className="sidebar-brand">
           <span className="brand-icon">⚓</span>
@@ -104,18 +93,33 @@ export default function App() {
         </nav>
 
         <div className="sidebar-footer">
-          <div className="status-dot" />
-          <span>API Connected</span>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', width: '100%' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div className="status-dot" />
+              <span>API Connected</span>
+            </div>
+            {isLoggedIn && (
+              <button
+                onClick={logout}
+                className="btn btn-danger btn-sm"
+                style={{ width: '100%' }}
+              >
+                🚪 Déconnexion
+              </button>
+            )}
+          </div>
         </div>
       </aside>
 
       {/* ── MAIN CONTENT ──────────────────────────────────── */}
       <main className="main-content">
         <Routes>
-          <Route path="/"             element={<Dashboard />} />
-          <Route path="/bateaux"      element={<Bateaux />} />
-          <Route path="/clients"      element={<Clients />} />
-          <Route path="/reservations" element={<Reservations />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/"             element={<PrivateRoute><Dashboard /></PrivateRoute>} />
+          <Route path="/bateaux"      element={<PrivateRoute><Bateaux /></PrivateRoute>} />
+          <Route path="/clients"      element={<PrivateRoute><Clients /></PrivateRoute>} />
+          <Route path="/reservations" element={<PrivateRoute><Reservations /></PrivateRoute>} />
+          <Route path="*"             element={<Navigate to="/" replace />} />
         </Routes>
       </main>
 

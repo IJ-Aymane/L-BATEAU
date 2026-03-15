@@ -316,13 +316,13 @@ body {
 @media (max-width: 768px) {
   .main-content {
     margin-left: 0;
-    padding: 80px 14px 32px; /* 56px topbar + 24px gap */
+    padding: 80px 14px 32px;
     width: 100%;
   }
 }
 
 /* ============================================================
-   MOBILE PAGE HEADER — sticky section header inside main-content
+   MOBILE PAGE HEADER
    ============================================================ */
 
 .mobile-page-header {
@@ -335,12 +335,12 @@ body {
     align-items: center;
     justify-content: space-between;
     position: sticky;
-    top: 56px; /* just below topbar */
+    top: 56px;
     z-index: 150;
     background: var(--deep);
     border-bottom: 1px solid var(--border);
     padding: 12px 14px;
-    margin: -80px -14px 20px -14px; /* bleed to edges, push content down */
+    margin: -80px -14px 20px -14px;
     padding-top: 12px;
   }
 
@@ -355,7 +355,6 @@ body {
   }
 }
 
-/* On desktop: keep original page-header behavior, hide mobile one */
 @media (min-width: 769px) {
   .mobile-page-header { display: none; }
 }
@@ -429,7 +428,6 @@ body {
 
 .btn-sm { padding: 6px 12px; font-size: 12px; border-radius: 6px; }
 
-/* On mobile, action buttons in tables stack nicely */
 @media (max-width: 480px) {
   .btn-sm { padding: 8px 10px; font-size: 12px; }
 }
@@ -452,7 +450,6 @@ body {
 .table-wrap {
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
-  /* subtle scroll hint on mobile */
   scrollbar-width: thin;
   scrollbar-color: var(--border) transparent;
 }
@@ -464,7 +461,7 @@ body {
 table {
   width: 100%;
   border-collapse: collapse;
-  min-width: 520px; /* forces scroll on small screens instead of breaking */
+  min-width: 520px;
 }
 
 thead th {
@@ -495,7 +492,6 @@ td {
   vertical-align: middle;
 }
 
-/* Action column: prevent wrapping */
 td:last-child { white-space: nowrap; }
 
 /* ============================================================
@@ -532,7 +528,7 @@ td:last-child { white-space: nowrap; }
   justify-content: center;
   z-index: 400;
   animation: fadeIn 0.18s ease;
-  padding: 16px; /* prevents modal touching screen edges on mobile */
+  padding: 16px;
 }
 
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
@@ -544,12 +540,10 @@ td:last-child { white-space: nowrap; }
   padding: 24px;
   width: 100%;
   max-width: 480px;
-  max-height: 90dvh;      /* dynamic viewport height for mobile browsers */
+  max-height: 90dvh;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   animation: slideUp 0.22s cubic-bezier(.4,0,.2,1);
-
-  /* custom scrollbar inside modal */
   scrollbar-width: thin;
   scrollbar-color: var(--border) transparent;
 }
@@ -599,12 +593,10 @@ td:last-child { white-space: nowrap; }
   font-size: 14px;
   outline: none;
   transition: border-color var(--t), box-shadow var(--t);
-  /* Prevent iOS zoom on focus (font-size must be ≥16px on iOS) */
   -webkit-appearance: none;
   appearance: none;
 }
 
-/* iOS zoom fix: bump font size to 16px on mobile */
 @media (max-width: 768px) {
   .form-group input,
   .form-group select,
@@ -628,7 +620,6 @@ td:last-child { white-space: nowrap; }
 
 .form-group select option { background: var(--card); }
 
-/* datetime-local icon color fix (webkit) */
 .form-group input[type="datetime-local"]::-webkit-calendar-picker-indicator {
   filter: invert(0.6);
   cursor: pointer;
@@ -642,7 +633,6 @@ td:last-child { white-space: nowrap; }
   flex-wrap: wrap;
 }
 
-/* On very small screens, stack buttons */
 @media (max-width: 360px) {
   .modal-actions { flex-direction: column; }
   .modal-actions .btn { width: 100%; }
@@ -685,7 +675,7 @@ td:last-child { white-space: nowrap; }
 }
 
 /* ============================================================
-   DASHBOARD GRID — responsive
+   DASHBOARD GRID
    ============================================================ */
 
 .stats-grid {
@@ -758,7 +748,7 @@ td:last-child { white-space: nowrap; }
   background: var(--deep);
   border-radius: 8px;
   padding: 12px 14px;
-  min-width: 0; /* prevent overflow */
+  min-width: 0;
 }
 
 .info-item-label {
@@ -807,13 +797,11 @@ td:last-child { white-space: nowrap; }
 
 .mobile-card:last-child { border-bottom: none; }
 
-/* Colored left border accent per status */
 .mobile-card.accent-blue   { border-left: 3px solid var(--accent); }
 .mobile-card.accent-green  { border-left: 3px solid var(--green);  }
 .mobile-card.accent-gold   { border-left: 3px solid var(--gold);   }
 .mobile-card.accent-red    { border-left: 3px solid var(--red);    }
 
-/* ── Summary row (always visible) ── */
 .mc-summary {
   display: flex;
   align-items: center;
@@ -851,7 +839,6 @@ td:last-child { white-space: nowrap; }
   flex-shrink: 0;
 }
 
-/* Arrow chevron */
 .mc-chevron {
   font-size: 11px;
   color: var(--muted);
@@ -864,7 +851,6 @@ td:last-child { white-space: nowrap; }
   transform: rotate(180deg);
 }
 
-/* ── Expanded body ── */
 .mc-body {
   display: none;
   flex-direction: column;
@@ -904,7 +890,6 @@ td:last-child { white-space: nowrap; }
   word-break: break-word;
 }
 
-/* Action row inside expanded */
 .mc-actions {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -928,7 +913,6 @@ td:last-child { white-space: nowrap; }
 .mc-actions .btn:last-child  { color: var(--red); }
 .mc-actions .btn:last-child:hover  { background: rgba(239,68,68,0.08); }
 
-/* Divider — kept for compatibility */
 .mc-divider { display: none; }
 
 /* ============================================================
@@ -957,3 +941,116 @@ td:last-child { white-space: nowrap; }
 .fw-bold     { font-weight: 700; }
 .fs-sm       { font-size: 12px; }
 .fs-xs       { font-size: 11px; }
+
+/* ============================================================
+   LOGIN PAGE
+   ============================================================ */
+
+.login-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--deep);
+  padding: 1rem;
+  /* subtle grid pattern background */
+  background-image:
+    linear-gradient(rgba(14,165,233,0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(14,165,233,0.03) 1px, transparent 1px);
+  background-size: 40px 40px;
+}
+
+.login-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 40px 32px;
+  width: 100%;
+  max-width: 400px;
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+  animation: slideUp 0.3s cubic-bezier(.4,0,.2,1);
+  /* top accent line */
+  border-top: 3px solid var(--accent);
+}
+
+@media (max-width: 480px) {
+  .login-card {
+    padding: 32px 20px;
+    border-radius: 12px;
+    gap: 24px;
+  }
+}
+
+/* Brand block */
+.login-brand {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  text-align: center;
+}
+
+.login-brand-icon {
+  font-size: 2.8rem;
+  line-height: 1;
+  /* subtle glow */
+  filter: drop-shadow(0 0 12px rgba(14,165,233,0.4));
+}
+
+.login-brand-name {
+  font-family: var(--font-display);
+  font-size: 2.2rem;
+  letter-spacing: 6px;
+  color: var(--accent);
+  line-height: 1;
+}
+
+.login-brand-sub {
+  font-size: 10px;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* Divider line between brand and form */
+.login-brand::after {
+  content: '';
+  display: block;
+  width: 48px;
+  height: 1px;
+  background: var(--border);
+  margin-top: 6px;
+}
+
+/* Form */
+.login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* Login submit button — full width override */
+.login-form .btn-primary {
+  width: 100%;
+  padding: 12px;
+  font-size: 14px;
+  letter-spacing: 1px;
+  margin-top: 4px;
+}
+
+.login-form .btn-primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+/* Footer hint */
+.login-footer {
+  text-align: center;
+  font-size: 11px;
+  color: var(--muted);
+  letter-spacing: 0.5px;
+}
