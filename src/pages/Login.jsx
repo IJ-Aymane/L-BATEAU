@@ -11,15 +11,29 @@ export default function Login() {
 
   const handleLogin = async (e) => {
     e.preventDefault();
-    if (!username || !password) { setError('Remplir tous les champs'); return; }
+
+    // Client-side validation
+    if (!username.trim() || !password.trim()) {
+      setError('Veuillez remplir tous les champs.');
+      return;
+    }
+
     setLoading(true);
     setError('');
+
     try {
-      const res = await authAPI.login(username, password);
+      const res = await authAPI.login(username.trim(), password);
+
+      if (!res.data?.token) {
+        setError('Réponse invalide du serveur. Contactez l\'administrateur.');
+        return;
+      }
+
       localStorage.setItem('jwt_token', res.data.token);
       navigate('/');
     } catch (err) {
-      setError(err.response?.status === 401 ? 'Identifiants incorrects' : 'Erreur serveur');
+      // err.userMessage is set by the authAxios interceptor in api.js
+      setError(err.userMessage || 'Une erreur inattendue est survenue.');
     } finally {
       setLoading(false);
     }
@@ -35,42 +49,50 @@ export default function Login() {
           <div className="login-brand-sub">Management System</div>
         </div>
 
-        <form className="login-form" onSubmit={handleLogin}>
-          {error && <div className="error-msg">{error}</div>}
+        <form className="login-form" onSubmit={handleLogin} noValidate>
+          {error && (
+            <div className="error-msg" role="alert" aria-live="polite">
+              {error}
+            </div>
+          )}
 
           <div className="form-group">
-            <label>Nom d'utilisateur</label>
+            <label htmlFor="username">Nom d'utilisateur</label>
             <input
+              id="username"
               type="text"
               value={username}
-              onChange={e => setUsername(e.target.value)}
+              onChange={e => { setUsername(e.target.value); setError(''); }}
               placeholder="admin"
               autoFocus
               autoComplete="username"
+              disabled={loading}
+              aria-describedby={error ? 'login-error' : undefined}
             />
           </div>
 
           <div className="form-group">
-            <label>Mot de passe</label>
+            <label htmlFor="password">Mot de passe</label>
             <input
+              id="password"
               type="password"
               value={password}
-              onChange={e => setPassword(e.target.value)}
+              onChange={e => { setPassword(e.target.value); setError(''); }}
               placeholder="••••••••"
               autoComplete="current-password"
+              disabled={loading}
             />
           </div>
 
           <button
             className="btn btn-primary"
             type="submit"
-            disabled={loading}
+            disabled={loading || !username.trim() || !password.trim()}
             style={{ width: '100%', marginTop: '4px' }}
           >
             {loading ? 'Connexion...' : 'Se connecter'}
           </button>
 
-          {/* Forgot password link */}
           <div style={{ textAlign: 'center', marginTop: '8px' }}>
             <Link
               to="/forgot-password"
