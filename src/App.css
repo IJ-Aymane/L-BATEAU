@@ -223,6 +223,27 @@ tr:last-child td { border-bottom: 0; }
 .confirmation-page { min-height: calc(100vh - 74px); display: grid; place-items: center; }
 .confirmation-card { text-align: center; display: grid; justify-items: center; gap: 16px; max-width: 560px; }
 
+.booking-layout { align-items: start; }
+.booking-card { display: grid; gap: 18px; }
+.booking-summary { display: grid; gap: 14px; }
+.booking-summary > img, .booking-summary > .image-placeholder { width: 100%; height: 180px; border-radius: 10px; object-fit: cover; }
+.booking-summary div:not(.empty-state) { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px; border-radius: 10px; background: var(--bg-page); }
+.price-preview { display: grid; gap: 4px; padding: 16px; border-radius: 12px; background: var(--bg-page); border: 1px solid var(--border); }
+.price-preview span, .price-preview small { color: var(--text-body); }
+.price-preview strong { color: var(--secondary); font-family: var(--font-heading); font-size: 2rem; line-height: 1; }
+.invoice-panel { grid-column: 1 / -1; padding: 24px; }
+.invoice-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin: 18px 0; }
+.invoice-grid > div, .invoice-total { padding: 14px; border-radius: 10px; background: var(--bg-page); }
+.invoice-grid span, .invoice-total span { color: var(--text-body); font-size: .72rem; font-weight: 800; text-transform: uppercase; }
+.invoice-grid strong, .invoice-total strong { display: block; color: var(--text-heading); margin-top: 4px; }
+.invoice-total { display: grid; grid-template-columns: 1fr auto; gap: 10px 18px; }
+
+@media print {
+  .public-header, .booking-card, .booking-summary { display: none !important; }
+  .public-main, .tunnel-layout { display: block; width: 100%; padding: 0; }
+  .invoice-panel { box-shadow: none; border: 0; }
+}
+
 /* Manager and account */
 .planning-shell { display: grid; grid-template-columns: minmax(0, 1fr) 286px; gap: 18px; align-items: start; }
 .timeline-grid { padding: 14px; overflow-x: auto; }
@@ -310,7 +331,7 @@ tr:last-child td { border-bottom: 0; }
   .auth-page { grid-template-columns: 1fr; }
   .auth-hero { min-height: 42vh; }
   .auth-panel { padding: 20px; }
-  .contact-grid, .catalogue-layout, .detail-hero, .detail-layout, .split-grid { grid-template-columns: 1fr; }
+  .contact-grid, .catalogue-layout, .detail-hero, .detail-layout, .split-grid, .invoice-grid { grid-template-columns: 1fr; }
   .public-header { position: static; }
   .public-nav { gap: 10px; font-size: .86rem; }
   .public-main { padding-top: 28px; }

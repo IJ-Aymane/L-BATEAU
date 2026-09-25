@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useParams, useSearchParams } from 'react-router-dom';
 import api, { bateauxAPI, catalogueAPI, clientsAPI, reservationsAPI, usersAPI } from '../api';
+import { getStoredUser } from '../auth';
 
 const faqs = [
   ['Quel est l\'âge minimum ?', 'Le conducteur doit avoir 18 ans minimum. Les passagers mineurs sont acceptés avec un adulte responsable.'],
@@ -418,8 +419,8 @@ export function AdminDashboard() {
                 {todays.map((r) => (
                   <tr key={r.id || `${r.clientId}-${r.dateDebut}`}>
                     <td>{fmtTime(r.dateDebut)}</td>
-                    <td>{clients.find((c) => c.id === r.clientId)?.nomComplet || '-'}</td>
-                    <td>{boats.find((b) => b.id === r.bateauId)?.nom || '-'}</td>
+                    <td>{clients.find((c) => c.id === r.clientId)?.nomComplet || r.clientName || r.username || '-'}</td>
+                    <td>{boats.find((b) => b.id === r.bateauId)?.nom || r.bateauNom || '-'}</td>
                     <td>{r.nbHeures || '-'}h</td>
                     <td><span className={`badge ${statusBadge(r.statut)}`}>{r.statut || '-'}</span></td>
                     <td>{money(r.montantTotal)}</td>
@@ -828,7 +829,7 @@ export function ManagerPlanning() {
                 {hours.map((h) => <button key={h} onClick={() => setDraft({ boatId: boat.id, hour: h, step: 1 })} onDragOver={(e) => e.preventDefault()} onDrop={() => dropBooking(boat.id, h)} />)}
                 {blocksFor(boat.id).map((r) => (
                   <Link draggable onDragStart={() => setDrag(r)} to={`/manager/reservations/${r.id}`} key={r.id} className={`booking-block ${statusBadge(r.statut)}`} style={blockStyle(r)}>
-                    {clients.find((c) => c.id === r.clientId)?.nomComplet || '-'} · {r.nbHeures || '-'}h
+                    {clients.find((c) => c.id === r.clientId)?.nomComplet || r.clientName || r.username || '-'} · {r.nbHeures || '-'}h
                   </Link>
                 ))}
               </div>
@@ -872,8 +873,8 @@ export function ReservationDetail() {
   const [status, setStatus] = useState(reservation?.statut || 'PENDING');
 
   if (!id || !reservation) return <ManualBookingPage />;
-  const client = clients.find((c) => c.id === reservation.clientId);
-  const boat = boats.find((b) => b.id === reservation.bateauId);
+  const client = clients.find((c) => c.id === reservation.clientId) || { nomComplet: reservation.clientName || reservation.username, telephone: reservation.userTelephone };
+  const boat = boats.find((b) => b.id === reservation.bateauId) || { nom: reservation.bateauNom, type: reservation.bateauType };
   const actions = status === 'PENDING' ? ['Confirm', 'Edit', 'Cancel', 'Send Reminder'] : status === 'CONFIRMED' ? ['Start Prestation', 'Add Payment', 'Generate Invoice', 'Cancel'] : ['Complete Prestation', 'Generate Invoice'];
 
   return (
@@ -953,7 +954,7 @@ function EquipmentCard({ item }) {
         ].filter(Boolean).join(' · ') || 'Informations à compléter'}</p>
         <strong>{priceLabel(item.prixParHeure)}</strong>
       </div>
-      <div className="card-actions"><Link className="btn btn-secondary" to={`/catalogue/${item.id}`}>Détails</Link><Link className="btn btn-primary" to="/reservation/tunnel">Réserver</Link></div>
+      <div className="card-actions"><Link className="btn btn-secondary" to={`/catalogue/${item.id}`}>Détails</Link><Link className="btn btn-primary" to={`/reservation/tunnel?bateauId=${item.id}`}>Réserver</Link></div>
     </article>
   );
 }
@@ -969,7 +970,7 @@ export function CatalogueDetailPage() {
         {!item ? <EmptyState title="Équipement introuvable" message="Aucune donnée n’est disponible pour cet équipement." /> : <>
           <div className="detail-hero card">
             <BoatImage item={item} />
-            <div><span className="badge badge-neutral">{item.type || 'Équipement'}</span><h1>{item.nom}</h1><p>{item.description || 'Description non renseignée.'}</p><Link className="btn btn-primary" to="/reservation/tunnel">Choisir un créneau</Link></div>
+            <div><span className="badge badge-neutral">{item.type || 'Équipement'}</span><h1>{item.nom}</h1><p>{item.description || 'Description non renseignée.'}</p><Link className="btn btn-primary" to={`/reservation/tunnel?bateauId=${item.id}`}>Choisir un créneau</Link></div>
           </div>
           <div className="detail-layout">
             <div className="card detail-card"><h2>Specs techniques</h2><p>Capacité {item.capaciteMax || '-'} pers.<br />Puissance {item.puissance || '-'}<br />Modèle {item.marque || '-'}</p></div>
@@ -982,41 +983,185 @@ export function CatalogueDetailPage() {
   );
 }
 
+function InvoicePanel({ invoice, onPrint }) {
+  if (!invoice) return null;
+  return (
+    <section className="card invoice-panel">
+      <div className="section-head">
+        <div>
+          <span className="eyebrow">Facture</span>
+          <h2>{invoice.reference || 'Facture réservation'}</h2>
+        </div>
+        <button className="btn btn-secondary" type="button" onClick={onPrint}>Imprimer</button>
+      </div>
+      <div className="invoice-grid">
+        <div>
+          <span>Client</span>
+          <strong>{invoice.client?.username || '-'}</strong>
+          <p>{invoice.client?.email || invoice.client?.telephone || '-'}</p>
+        </div>
+        <div>
+          <span>Bateau</span>
+          <strong>{invoice.bateau?.nom || '-'}</strong>
+          <p>{invoice.bateau?.type || invoice.bateau?.marque || '-'}</p>
+        </div>
+        <div>
+          <span>Créneau</span>
+          <strong>{fmtDate(invoice.dateDebut)} · {fmtTime(invoice.dateDebut)}</strong>
+          <p>{invoice.nombreHeures}h, retour {fmtTime(invoice.dateFin)}</p>
+        </div>
+        <div>
+          <span>Paiement</span>
+          <strong>{invoice.paymentStatus || 'PENDING'}</strong>
+          <p>{invoice.statut || '-'}</p>
+        </div>
+      </div>
+      <div className="invoice-total">
+        <span>Sous-total</span><strong>{money(invoice.subtotal)}</strong>
+        <span>Total</span><strong>{money(invoice.totalPrice)}</strong>
+      </div>
+    </section>
+  );
+}
+
 export function ReservationTunnelPage() {
-  const [step, setStep] = useState(1);
-  const [confirmed, setConfirmed] = useState(false);
-  const [timer, setTimer] = useState(600);
-  const [form, setForm] = useState({ date: todayKey(), time: '10:00', duration: 2, name: '', email: '', options: 'Skipper', method: 'CMI' });
-  const reference = `BLM-${form.date.replaceAll('-', '').slice(2)}-${form.time.replace(':', '')}`;
+  const [searchParams] = useSearchParams();
+  const currentUser = getStoredUser();
+  const [boats, setBoats] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
+  const [reservation, setReservation] = useState(null);
+  const [invoice, setInvoice] = useState(null);
+  const [form, setForm] = useState({
+    bateauId: searchParams.get('bateauId') || '',
+    date: todayKey(),
+    time: '10:00',
+    nombreHeures: 2,
+  });
 
   useEffect(() => {
-    if (confirmed) return undefined;
-    const id = setInterval(() => setTimer((value) => Math.max(0, value - 1)), 1000);
-    return () => clearInterval(id);
-  }, [confirmed]);
+    setLoading(true);
+    catalogueAPI.getAll()
+      .then((res) => {
+        const rows = unwrap(res);
+        setBoats(rows);
+        setForm((prev) => ({
+          ...prev,
+          bateauId: prev.bateauId || rows[0]?.id || '',
+        }));
+      })
+      .catch((err) => setError(err.userMessage || 'Impossible de charger les bateaux.'))
+      .finally(() => setLoading(false));
+  }, []);
 
-  if (confirmed) {
-    return (
-      <div className="public-page">
-        <PublicHeader />
-        <main className="public-main confirmation-page">
-          <div className="card confirmation-card"><span className="badge badge-success">Confirmée</span><h1>Réservation {reference}</h1><p>Votre reçu et les instructions pratiques sont prêts.</p><button className="btn btn-secondary" onClick={() => downloadInvoicePdf({ title: 'Recu', reference, reservation: { dateDebut: `${form.date}T${form.time}`, duration: form.duration, montantTotal: Number(form.duration) * 720, montantPaye: Number(form.duration) * 720, montantRestant: 0, statut: 'CONFIRMED' }, client: { nomComplet: form.name, email: form.email } })}>Télécharger le reçu</button><Link className="btn btn-primary" to="/compte/reservations">Voir mon compte</Link></div>
-        </main>
-      </div>
-    );
-  }
+  const selectedBoat = boats.find((boat) => String(boat.id) === String(form.bateauId));
+  const hours = Math.max(1, Number(form.nombreHeures || 1));
+  const pricePreview = Number(selectedBoat?.prixParHeure || 0) * hours;
+  const canSubmit = Boolean(currentUser?.id && form.bateauId && form.date && form.time && hours > 0 && !submitting);
+
+  const setField = (field, value) => {
+    setError('');
+    setForm((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const submit = async (event) => {
+    event.preventDefault();
+    setError('');
+    setReservation(null);
+    setInvoice(null);
+
+    if (!currentUser?.id) {
+      setError('Connectez-vous de nouveau pour créer une réservation client.');
+      return;
+    }
+    if (!canSubmit) return;
+
+    setSubmitting(true);
+    try {
+      const payload = {
+        userId: currentUser.id,
+        bateauId: form.bateauId,
+        dateDebut: `${form.date}T${form.time}:00`,
+        nombreHeures: hours,
+      };
+      const created = await reservationsAPI.create(payload);
+      const savedReservation = created.data;
+      setReservation(savedReservation);
+      const invoiceRes = await reservationsAPI.getInvoice(savedReservation.id);
+      setInvoice(invoiceRes.data);
+    } catch (err) {
+      setError(err.userMessage || 'Ce bateau est indisponible sur le créneau sélectionné.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   return (
     <div className="public-page">
       <PublicHeader />
-      <main className="public-main tunnel-layout">
-        <section className="card wizard-card">
-          <div className="stepper"><span className={step >= 1 ? 'active' : ''}>Créneau</span><span className={step >= 2 ? 'active' : ''}>Client</span><span className={step >= 3 ? 'active' : ''}>Paiement</span></div>
-          {step === 1 && <div className="form-grid"><label>Date<input type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} /></label><label>Heure<input type="time" value={form.time} onChange={(e) => setForm({ ...form, time: e.target.value })} /></label><label>Durée<input type="number" min="1" value={form.duration} onChange={(e) => setForm({ ...form, duration: e.target.value })} /></label><button className="btn btn-primary" onClick={() => setStep(2)}>Continuer</button></div>}
-          {step === 2 && <div className="form-grid"><label>Nom complet<input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></label><label>Email<input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></label><label>Options<select value={form.options} onChange={(e) => setForm({ ...form, options: e.target.value })}><option>Skipper</option><option>Sans option</option><option>Pack groupe</option></select></label><button className="btn btn-primary" onClick={() => setStep(3)}>Continuer</button></div>}
-          {step === 3 && <div className="form-grid"><label>Paiement<select value={form.method} onChange={(e) => setForm({ ...form, method: e.target.value })}><option>CMI</option><option>Payer en agence</option></select></label><button className="btn btn-primary" onClick={() => setConfirmed(true)}>Redirection CMI</button><button className="btn btn-secondary" onClick={() => setStep(2)}>Retour</button></div>}
+      <main className="public-main tunnel-layout booking-layout">
+        <section className="card wizard-card booking-card">
+          <div className="section-head">
+            <div>
+              <span className="eyebrow">Réservation</span>
+              <h1>Choisir un créneau</h1>
+            </div>
+            {reservation && <span className="badge badge-success">{reservation.statut}</span>}
+          </div>
+
+          {error && <div className="notice error" role="alert">{error}</div>}
+          {!currentUser?.id && <div className="notice error">Session utilisateur incomplète. Reconnectez-vous avant de réserver.</div>}
+
+          <form className="form-grid" onSubmit={submit}>
+            <label>Bateau
+              <select value={form.bateauId} onChange={(e) => setField('bateauId', e.target.value)} disabled={loading} required>
+                <option value="">Sélectionner un bateau</option>
+                {boats.map((boat) => (
+                  <option key={boat.id} value={boat.id}>
+                    {boat.nom} · {boat.type || 'Bateau'} · {priceLabel(boat.prixParHeure)}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <div className="form-grid two">
+              <label>Date de départ
+                <input type="date" value={form.date} onChange={(e) => setField('date', e.target.value)} required />
+              </label>
+              <label>Heure de départ
+                <input type="time" value={form.time} onChange={(e) => setField('time', e.target.value)} required />
+              </label>
+            </div>
+
+            <label>Nombre d'heures
+              <input type="number" min="1" max="24" value={form.nombreHeures} onChange={(e) => setField('nombreHeures', e.target.value)} required />
+            </label>
+
+            <div className="price-preview">
+              <span>Total estimé</span>
+              <strong>{money(pricePreview)}</strong>
+              <small>{selectedBoat ? `${money(selectedBoat.prixParHeure)} x ${hours}h` : 'Choisissez un bateau pour calculer le prix.'}</small>
+            </div>
+
+            <button className="btn btn-primary" type="submit" disabled={!canSubmit}>
+              {submitting ? 'Création...' : 'Confirmer la réservation'}
+            </button>
+          </form>
         </section>
-        <aside className="sticky-summary card"><span className="badge badge-pending">Verrouillage {Math.floor(timer / 60)}:{String(timer % 60).padStart(2, '0')}</span><h2>Récapitulatif</h2><p>{form.date} à {form.time}<br />Durée {form.duration}h<br />Option {form.options}</p><strong>{money(Number(form.duration) * 720)}</strong></aside>
+
+        <aside className="sticky-summary card booking-summary">
+          {selectedBoat ? <>
+            <BoatImage item={selectedBoat} />
+            <h2>{selectedBoat.nom}</h2>
+            <p>{selectedBoat.type || '-'} · {selectedBoat.capaciteMax || '-'} pers.</p>
+            <div><span>Tarif horaire</span><strong>{money(selectedBoat.prixParHeure)}</strong></div>
+            <div><span>Durée</span><strong>{hours}h</strong></div>
+            <div><span>Total</span><strong>{money(pricePreview)}</strong></div>
+          </> : <EmptyState title="Aucun bateau" message="Ajoutez des bateaux disponibles dans la base." />}
+        </aside>
+
+        {invoice && <InvoicePanel invoice={invoice} onPrint={() => window.print()} />}
       </main>
     </div>
   );
@@ -1024,12 +1169,25 @@ export function ReservationTunnelPage() {
 
 export function ClientAccountPage() {
   const { tab = 'reservations' } = useParams();
-  const { boats, clients, reservations } = useFleetData();
+  const currentUser = getStoredUser();
+  const { boats, clients, reservations: allReservations } = useFleetData();
+  const [userReservations, setUserReservations] = useState([]);
   const tabs = [['reservations', 'Mes réservations'], ['historique', 'Historique'], ['factures', 'Mes factures'], ['profil', 'Mon profil']];
+
+  useEffect(() => {
+    if (!currentUser?.id) return undefined;
+    let active = true;
+    reservationsAPI.getByUser(currentUser.id)
+      .then((res) => { if (active) setUserReservations(unwrap(res)); })
+      .catch(() => { if (active) setUserReservations([]); });
+    return () => { active = false; };
+  }, [currentUser?.id]);
+
+  const reservations = currentUser?.id ? userReservations : allReservations;
   const upcoming = reservations.filter((r) => !r.dateDebut || new Date(r.dateDebut) >= new Date());
   const past = reservations.filter((r) => r.dateDebut && new Date(r.dateDebut) < new Date());
-  const clientFor = (reservation) => clients.find((client) => client.id === reservation.clientId) || {};
-  const boatFor = (reservation) => boats.find((boat) => boat.id === reservation.bateauId) || {};
+  const clientFor = (reservation) => clients.find((client) => client.id === reservation.clientId) || { nomComplet: reservation.clientName || reservation.username, email: reservation.userEmail, telephone: reservation.userTelephone };
+  const boatFor = (reservation) => boats.find((boat) => boat.id === reservation.bateauId) || { nom: reservation.bateauNom, type: reservation.bateauType };
 
   return (
     <div>

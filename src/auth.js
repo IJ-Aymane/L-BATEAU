@@ -78,6 +78,17 @@ export const clearSession = () => {
   stores().forEach((store) => SESSION_KEYS.forEach((key) => store.removeItem(key)));
 };
 
+
+export const getStoredUser = () => {
+  const raw = getStoredValue('user_profile');
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+};
+
 export const getStoredRole = () => {
   const stored = normalizeRole(getStoredValue('user_role'));
   if (stored) return stored;

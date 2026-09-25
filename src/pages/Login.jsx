@@ -54,7 +54,10 @@ export default function Login() {
         role,
         remember: login.remember,
         user: payload.user || {
+          id: payload.id || payload.userId,
           username: payload.username || login.username.trim(),
+          email: payload.email,
+          telephone: payload.telephone,
           roles: payload.roles || [],
           role,
         },
