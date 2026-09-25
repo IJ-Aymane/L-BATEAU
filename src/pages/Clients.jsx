@@ -22,7 +22,10 @@ export default function Clients() {
       .finally(() => setLoading(false));
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    const id = window.setTimeout(load, 0);
+    return () => window.clearTimeout(id);
+  }, []);
 
   const toggle     = (id) => setOpenId(prev => prev === id ? null : id);
   const openCreate = ()   => { setForm(EMPTY); setEditId(null); setModal(true); setError(''); };

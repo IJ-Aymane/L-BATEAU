@@ -135,8 +135,7 @@ export default function ResetPassword() {
       <div className="login-card">
 
         <div className="login-brand">
-          <span className="login-brand-icon">⚓</span>
-          <div className="login-brand-name">L'BATEAU</div>
+          <img className="login-brand-logo" src="img/logo.png" alt="Blue Lagoon Marine" />
           <div className="login-brand-sub">Nouveau mot de passe</div>
         </div>
 
@@ -156,7 +155,7 @@ export default function ResetPassword() {
             <button
               className="btn btn-primary"
               style={{ width: '100%' }}
-              onClick={() => navigate('/login')}
+              onClick={() => navigate('/connexion')}
             >
               Se connecter →
             </button>

@@ -1,130 +1,156 @@
-import { useState, useEffect } from 'react';
-import { Routes, Route, NavLink, useLocation, useNavigate, Navigate } from 'react-router-dom';
-import Bateaux        from './pages/Bateaux';
-import Clients        from './pages/Clients';
-import Reservations   from './pages/Reservations';
-import Dashboard      from './pages/Dashboard';
-import Login          from './pages/Login';
+import { useEffect, useMemo, useState } from 'react';
+import { Navigate, NavLink, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
+import Bateaux from './pages/Bateaux';
+import Clients from './pages/Clients';
+import Reservations from './pages/Reservations';
+import Login from './pages/Login';
 import ForgotPassword from './pages/ForgotPassword';
-import ResetPassword  from './pages/ResetPassword';
-import PrivateRoute   from './components/PrivateRoute';
+import ResetPassword from './pages/ResetPassword';
+import PrivateRoute from './components/PrivateRoute';
+import { clearSession, getRoleHome, getStoredRole, normalizeRole } from './auth';
+import {
+  AdminDashboard,
+  AdminFleet,
+  AdminUsers,
+  CatalogueDetailPage,
+  CataloguePage,
+  ClientAccountPage,
+  ContactPage,
+  ManagerPlanning,
+  ReservationDetail,
+  ReservationTunnelPage,
+  TechFleetPage,
+} from './pages/MarinePages';
 import './App.css';
 
-const PUBLIC_ROUTES = ['/login', '/forgot-password', '/reset-password'];
+const shelllessRoutes = [
+  '/login',
+  '/connexion',
+  '/forgot-password',
+  '/reset-password',
+  '/contact',
+  '/catalogue',
+  '/reservation/tunnel',
+];
+
+const nav = [
+  { to: '/admin/dashboard', label: 'Dashboard', icon: 'DB', roles: ['ADMIN'] },
+  { to: '/admin/flotte', label: 'Flotte', icon: 'FL', roles: ['ADMIN'] },
+  { to: '/admin/utilisateurs', label: 'Utilisateurs', icon: 'US', roles: ['ADMIN'] },
+  { to: '/manager/planning', label: 'Planning', icon: 'PL', roles: ['ADMIN', 'MANAGER'] },
+  { to: '/manager/reservations/new', label: 'Réservation', icon: 'RS', roles: ['ADMIN', 'MANAGER'] },
+  { to: '/tech/flotte', label: 'Tech flotte', icon: 'TC', roles: ['ADMIN', 'TECHNICIAN'] },
+  { to: '/compte/reservations', label: 'Mon compte', icon: 'CP', roles: ['ADMIN', 'CLIENT'] },
+  { to: '/bateaux', label: 'Bateaux CRUD', icon: 'BT', roles: ['ADMIN'] },
+  { to: '/clients', label: 'Clients CRUD', icon: 'CL', roles: ['ADMIN'] },
+  { to: '/reservations', label: 'Résas CRUD', icon: 'RC', roles: ['ADMIN', 'MANAGER'] },
+];
+
+function BrandLogo({ className = '' }) {
+  return <img className={`brand-logo ${className}`.trim()} src="img/logo.png" alt="Blue Lagoon Marine" />;
+}
+
+function canSee(item, role) {
+  if (!item.roles?.length) return true;
+  return role === 'ADMIN' || item.roles.map(normalizeRole).includes(role);
+}
+
+function ShelllessRoutes() {
+  return (
+    <Routes>
+      <Route path="/login" element={<Login />} />
+      <Route path="/connexion" element={<Login />} />
+      <Route path="/forgot-password" element={<ForgotPassword />} />
+      <Route path="/reset-password" element={<ResetPassword />} />
+      <Route path="/contact" element={<ContactPage />} />
+      <Route path="/catalogue" element={<CataloguePage />} />
+      <Route path="/catalogue/:id" element={<CatalogueDetailPage />} />
+      <Route path="/reservation/tunnel" element={<ReservationTunnelPage />} />
+      <Route path="*" element={<Navigate to="/catalogue" replace />} />
+    </Routes>
+  );
+}
 
 export default function App() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const location  = useLocation();
-  const navigate  = useNavigate();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const role = getStoredRole();
+  const visibleNav = useMemo(() => nav.filter((item) => canSee(item, role)), [role]);
+  const isShellless = shelllessRoutes.some((route) => location.pathname === route || (route === '/catalogue' && location.pathname.startsWith('/catalogue/')));
+  const current = visibleNav.find((item) => location.pathname === item.to || location.pathname.startsWith(`${item.to}/`));
 
-  const isLoggedIn  = !!localStorage.getItem('jwt_token');
-  const isPublicPage = PUBLIC_ROUTES.includes(location.pathname);
-
-  useEffect(() => { setSidebarOpen(false); }, [location.pathname]);
+  useEffect(() => {
+    const id = window.setTimeout(() => setSidebarOpen(false), 0);
+    return () => window.clearTimeout(id);
+  }, [location.pathname]);
   useEffect(() => {
     document.body.style.overflow = sidebarOpen ? 'hidden' : '';
     return () => { document.body.style.overflow = ''; };
   }, [sidebarOpen]);
 
   const logout = () => {
-    localStorage.removeItem('jwt_token');
-    navigate('/login');
+    clearSession();
+    navigate('/connexion', { replace: true });
   };
 
-  const nav = [
-    { to: '/',             label: 'Dashboard',   icon: '◈' },
-    { to: '/bateaux',      label: 'Bateaux',      icon: '⛵' },
-    { to: '/clients',      label: 'Clients',      icon: '👤' },
-    { to: '/reservations', label: 'Réservations', icon: '📋' },
-  ];
-
-  const pageTitle = nav.find(n =>
-    n.to === '/' ? location.pathname === '/' : location.pathname.startsWith(n.to)
-  );
-
-  // Public pages — no layout
-  if (isPublicPage) {
-    return (
-      <Routes>
-        <Route path="/login"           element={<Login />} />
-        <Route path="/forgot-password" element={<ForgotPassword />} />
-        <Route path="/reset-password"  element={<ResetPassword />} />
-        <Route path="*"                element={<Navigate to="/login" replace />} />
-      </Routes>
-    );
-  }
+  if (isShellless) return <ShelllessRoutes />;
 
   return (
     <div className="app-layout">
-
-      {/* ── MOBILE TOPBAR ─────────────────────────────────── */}
       <header className="topbar">
         <button className="topbar-menu-btn" onClick={() => setSidebarOpen(true)} aria-label="Ouvrir le menu">
           <span className="hamburger-icon"><span /><span /><span /></span>
         </button>
-        <div className="topbar-brand">
-          <span className="topbar-brand-icon">⚓</span>
-          <span className="topbar-brand-name">Blue lagoon marine</span>
-        </div>
-        <div className="topbar-page">{pageTitle?.icon}</div>
+        <BrandLogo className="topbar-logo" />
+        <span className="topbar-page">{current?.icon || 'BL'}</span>
       </header>
 
-      {sidebarOpen && (
-        <div className="sidebar-overlay" onClick={() => setSidebarOpen(false)} aria-hidden="true" />
-      )}
+      {sidebarOpen && <div className="sidebar-overlay open" onClick={() => setSidebarOpen(false)} aria-hidden="true" />}
 
-      {/* ── SIDEBAR ───────────────────────────────────────── */}
       <aside className={`sidebar ${sidebarOpen ? 'open' : ''}`}>
-        <button className="sidebar-close-btn" onClick={() => setSidebarOpen(false)}>✕</button>
-
+        <button className="sidebar-close-btn" onClick={() => setSidebarOpen(false)} aria-label="Fermer">×</button>
         <div className="sidebar-brand">
-          <span className="brand-icon">⚓</span>
-          <div>
-            <div className="brand-name">L'BATEAU</div>
-            <div className="brand-sub">Management System</div>
-          </div>
+          <BrandLogo />
+          <span className="role-pill">{role}</span>
         </div>
 
-        <nav className="sidebar-nav">
-          {nav.map(n => (
-            <NavLink
-              key={n.to}
-              to={n.to}
-              end={n.to === '/'}
-              className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
-            >
-              <span className="nav-icon">{n.icon}</span>
-              <span>{n.label}</span>
+        <nav className="sidebar-nav" aria-label="Navigation principale">
+          {visibleNav.map((item) => (
+            <NavLink key={item.to} to={item.to} className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+              <span className="nav-icon">{item.icon}</span>
+              <span>{item.label}</span>
             </NavLink>
           ))}
         </nav>
 
         <div className="sidebar-footer">
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', width: '100%' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <div className="status-dot" />
-              <span>API Connected</span>
-            </div>
-            {isLoggedIn && (
-              <button onClick={logout} className="btn btn-danger btn-sm" style={{ width: '100%' }}>
-                🚪 Déconnexion
-              </button>
-            )}
-          </div>
+          <div className="status-row"><span className="status-dot" /> API connectée</div>
+          <button onClick={logout} className="btn btn-secondary btn-sm">Déconnexion</button>
         </div>
       </aside>
 
-      {/* ── MAIN CONTENT ──────────────────────────────────── */}
       <main className="main-content">
         <Routes>
-          <Route path="/"             element={<PrivateRoute><Dashboard /></PrivateRoute>} />
-          <Route path="/bateaux"      element={<PrivateRoute><Bateaux /></PrivateRoute>} />
-          <Route path="/clients"      element={<PrivateRoute><Clients /></PrivateRoute>} />
-          <Route path="/reservations" element={<PrivateRoute><Reservations /></PrivateRoute>} />
-          <Route path="*"             element={<Navigate to="/" replace />} />
+          <Route path="/" element={<Navigate to={getRoleHome(role)} replace />} />
+          <Route path="/admin/dashboard" element={<PrivateRoute roles={['ADMIN']}><AdminDashboard /></PrivateRoute>} />
+          <Route path="/admin/flotte" element={<PrivateRoute roles={['ADMIN']}><AdminFleet /></PrivateRoute>} />
+          <Route path="/admin/utilisateurs" element={<PrivateRoute roles={['ADMIN']}><AdminUsers /></PrivateRoute>} />
+          <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
+          <Route path="/manager/planning" element={<PrivateRoute roles={['ADMIN', 'MANAGER']}><ManagerPlanning /></PrivateRoute>} />
+          <Route path="/manager/reservations/new" element={<PrivateRoute roles={['ADMIN', 'MANAGER']}><ReservationDetail /></PrivateRoute>} />
+          <Route path="/manager/reservations/:id" element={<PrivateRoute roles={['ADMIN', 'MANAGER']}><ReservationDetail /></PrivateRoute>} />
+          <Route path="/manager" element={<Navigate to="/manager/planning" replace />} />
+          <Route path="/tech/flotte" element={<PrivateRoute roles={['ADMIN', 'TECHNICIAN']}><TechFleetPage /></PrivateRoute>} />
+          <Route path="/tech" element={<Navigate to="/tech/flotte" replace />} />
+          <Route path="/compte" element={<Navigate to="/compte/reservations" replace />} />
+          <Route path="/compte/:tab" element={<PrivateRoute roles={['ADMIN', 'CLIENT']}><ClientAccountPage /></PrivateRoute>} />
+          <Route path="/bateaux" element={<PrivateRoute roles={['ADMIN']}><Bateaux /></PrivateRoute>} />
+          <Route path="/clients" element={<PrivateRoute roles={['ADMIN']}><Clients /></PrivateRoute>} />
+          <Route path="/reservations" element={<PrivateRoute roles={['ADMIN', 'MANAGER']}><Reservations /></PrivateRoute>} />
+          <Route path="*" element={<Navigate to={getRoleHome(role)} replace />} />
         </Routes>
       </main>
-
     </div>
   );
 }

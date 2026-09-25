@@ -43,7 +43,7 @@ api.interceptors.response.use(
 
     if (err.response?.status === 401 && !isAuthEndpoint) {
       localStorage.removeItem('jwt_token');
-      window.location.href = '/login';
+      window.location.href = '/connexion';
     }
 
     // Attach a human-readable message to the error for easy use in components
@@ -85,6 +85,9 @@ authAxios.interceptors.response.use(
 export const authAPI = {
   login: (username, password) =>
     authAxios.post('/auth/login', { username, password }),
+
+  register: (data) =>
+    authAxios.post('/auth/register', data),
 
   forgotPassword: (emailOrPhone) =>
     authAxios.post('/auth/forgot-password', { emailOrPhone }),

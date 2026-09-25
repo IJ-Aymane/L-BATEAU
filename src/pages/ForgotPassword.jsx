@@ -83,8 +83,7 @@ export default function ForgotPassword() {
       <div className="login-card">
 
         <div className="login-brand">
-          <span className="login-brand-icon">⚓</span>
-          <div className="login-brand-name">L'BATEAU</div>
+          <img className="login-brand-logo" src="img/logo.png" alt="Blue Lagoon Marine" />
           <div className="login-brand-sub">Réinitialisation</div>
         </div>
 
@@ -120,9 +119,9 @@ export default function ForgotPassword() {
             <button
               className="btn btn-ghost"
               style={{ width: '100%' }}
-              onClick={() => navigate('/login')}
+              onClick={() => navigate('/connexion')}
             >
-              Retour au login
+              Retour à la connexion
             </button>
           </div>
         ) : (
@@ -180,9 +179,9 @@ export default function ForgotPassword() {
               type="button"
               className="btn btn-ghost"
               style={{ width: '100%' }}
-              onClick={() => navigate('/login')}
+              onClick={() => navigate('/connexion')}
             >
-              ← Retour au login
+              ← Retour à la connexion
             </button>
           </form>
         )}

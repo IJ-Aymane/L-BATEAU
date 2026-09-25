@@ -1,8 +1,9 @@
 import { Navigate } from 'react-router-dom';
+import { getRoleHome, roleCanAccess } from '../auth';
 
-// Wraps any route that requires authentication.
-// If no JWT token in localStorage → redirect to /login
-export default function PrivateRoute({ children }) {
+export default function PrivateRoute({ children, roles = [] }) {
   const token = localStorage.getItem('jwt_token');
-  return token ? children : <Navigate to="/login" replace />;
+  if (!token) return <Navigate to="/connexion" replace />;
+  if (!roleCanAccess(roles)) return <Navigate to={getRoleHome()} replace />;
+  return children;
 }

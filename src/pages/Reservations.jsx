@@ -28,7 +28,10 @@ export default function Reservations() {
       .finally(() => setLoading(false));
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    const id = window.setTimeout(load, 0);
+    return () => window.clearTimeout(id);
+  }, []);
 
   const toggle     = (id) => setOpenId(prev => prev === id ? null : id);
   const openCreate = ()   => { setForm(EMPTY); setEditId(null); setModal(true); setError(''); };
@@ -39,10 +42,13 @@ export default function Reservations() {
   };
 
   useEffect(() => {
-    const dD = new Date(form.dateDebut), dF = new Date(form.dateFin);
-    const nbHeures = (!isNaN(dD) && !isNaN(dF) && dF > dD) ? Math.round((dF - dD) / 3600000) : 0;
-    const montantRestant = (Number(form.montantTotal) || 0) - (Number(form.montantPaye) || 0);
-    setForm(prev => ({ ...prev, nbHeures, montantRestant }));
+    const id = window.setTimeout(() => {
+      const dD = new Date(form.dateDebut), dF = new Date(form.dateFin);
+      const nbHeures = (!isNaN(dD) && !isNaN(dF) && dF > dD) ? Math.round((dF - dD) / 3600000) : 0;
+      const montantRestant = (Number(form.montantTotal) || 0) - (Number(form.montantPaye) || 0);
+      setForm(prev => (prev.nbHeures === nbHeures && prev.montantRestant === montantRestant ? prev : { ...prev, nbHeures, montantRestant }));
+    }, 0);
+    return () => window.clearTimeout(id);
   }, [form.dateDebut, form.dateFin, form.montantTotal, form.montantPaye]);
 
   const save = async () => {

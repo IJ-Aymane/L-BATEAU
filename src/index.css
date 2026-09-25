@@ -1,33 +1,41 @@
-@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;1,9..40,300&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
 
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+*, *::before, *::after { box-sizing: border-box; }
 
 :root {
-  --navy: #0a0e1a;
-  --deep: #0d1528;
-  --card: #111827;
-  --border: #1e2d45;
-  --accent: #0ea5e9;
-  --accent2: #38bdf8;
-  --gold: #f59e0b;
-  --red: #ef4444;
-  --green: #10b981;
-  --text: #e2e8f0;
-  --muted: #64748b;
-  --font-display: 'Bebas Neue', sans-serif;
-  --font-body: 'DM Sans', sans-serif;
+  --primary: #E06038;
+  --primary-dark: #C84F2D;
+  --secondary: #0F4C5C;
+  --secondary-soft: #E4F0F2;
+  --bg-page: #FAF7F2;
+  --bg-card: #FFFFFF;
+  --text-heading: #1A1A1A;
+  --text-body: #555555;
+  --border: #EAEAEA;
+  --border-strong: #D0D0D0;
+  --success-bg: #E8F5E9;
+  --success-text: #2E7D32;
+  --pending-bg: #FFF3E0;
+  --pending-text: #E65100;
+  --neutral-bg: #F5F5F5;
+  --neutral-text: #616161;
+  --danger-bg: #FFEBEE;
+  --danger-text: #C62828;
+  --font-heading: 'Playfair Display', Georgia, serif;
+  --font-body: 'Plus Jakarta Sans', Inter, system-ui, sans-serif;
+  --sidebar-w: 272px;
+  --radius: 12px;
+  --radius-sm: 8px;
+  --shadow: 0 4px 20px rgba(0, 0, 0, 0.03);
+  --shadow-strong: 0 18px 60px rgba(15, 76, 92, 0.12);
+  font-family: var(--font-body);
+  color: var(--text-body);
+  background: var(--bg-page);
 }
 
 html { scroll-behavior: smooth; }
-body {
-  background: var(--navy);
-  color: var(--text);
-  font-family: var(--font-body);
-  font-size: 15px;
-  line-height: 1.6;
-  min-height: 100vh;
-}
-
-::-webkit-scrollbar { width: 6px; }
-::-webkit-scrollbar-track { background: var(--deep); }
-::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+body { margin: 0; min-height: 100vh; background: var(--bg-page); color: var(--text-body); font-family: var(--font-body); line-height: 1.6; }
+button, input, select, textarea { font: inherit; }
+a { color: inherit; }
+img { max-width: 100%; display: block; }
+::selection { background: rgba(224, 96, 56, 0.18); color: var(--text-heading); }
