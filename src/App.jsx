@@ -64,7 +64,7 @@ export default function App() {
         </button>
         <div className="topbar-brand">
           <span className="topbar-brand-icon">⚓</span>
-          <span className="topbar-brand-name">L'BATEAU</span>
+          <span className="topbar-brand-name">Blue lagoon marine</span>
         </div>
         <div className="topbar-page">{pageTitle?.icon}</div>
       </header>
