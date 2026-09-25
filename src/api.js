@@ -1,34 +1,34 @@
 import axios from 'axios';
+import { clearSession, getStoredToken } from './auth';
+import { environment } from './environment';
 
-const BASE = 'https://l-bateau-back.onrender.com/api';
+const BASE = environment.apiUrl;
 
-// ── Helpers ───────────────────────────────────────────────────
 const getErrorMessage = (err) => {
   const status = err.response?.status;
   const serverMsg = err.response?.data?.message || err.response?.data?.error;
 
-  if (!err.response) return 'Impossible de contacter le serveur. Vérifiez votre connexion.';
+  if (!err.response) return 'Impossible de contacter le serveur. Verifiez votre connexion.';
 
   switch (status) {
-    case 400: return serverMsg || 'Requête invalide.';
-    case 401: return 'Session expirée. Veuillez vous reconnecter.';
-    case 403: return 'Accès refusé.';
+    case 400: return serverMsg || 'Requete invalide.';
+    case 401: return 'Session expiree. Veuillez vous reconnecter.';
+    case 403: return 'Acces refuse.';
     case 404: return 'Ressource introuvable.';
-    case 409: return serverMsg || 'Conflit de données.';
-    case 422: return serverMsg || 'Données invalides.';
-    case 429: return 'Trop de requêtes. Réessayez dans quelques instants.';
+    case 409: return serverMsg || 'Conflit de donnees.';
+    case 422: return serverMsg || 'Donnees invalides.';
+    case 429: return 'Trop de requetes. Reessayez dans quelques instants.';
     case 500: return 'Erreur interne du serveur.';
     case 503: return 'Service temporairement indisponible.';
     default:  return serverMsg || `Erreur inattendue (${status}).`;
   }
 };
 
-// ── Authenticated instance ────────────────────────────────────
 const api = axios.create({ baseURL: BASE });
 
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('jwt_token');
+    const token = getStoredToken();
     if (token) config.headers.Authorization = `Bearer ${token}`;
     return config;
   },
@@ -38,24 +38,20 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (res) => res,
   (err) => {
-    // Only auto-redirect on 401 for protected routes (not auth endpoints)
     const isAuthEndpoint = err.config?.url?.includes('/auth/');
 
     if (err.response?.status === 401 && !isAuthEndpoint) {
-      localStorage.removeItem('jwt_token');
+      clearSession();
       window.location.href = '/connexion';
     }
 
-    // Attach a human-readable message to the error for easy use in components
     err.userMessage = getErrorMessage(err);
     return Promise.reject(err);
   }
 );
 
-// ── Auth (public endpoints — no token needed) ─────────────────
 const authAxios = axios.create({ baseURL: BASE });
 
-// Same error enrichment for auth calls
 authAxios.interceptors.response.use(
   (res) => res,
   (err) => {
@@ -63,19 +59,19 @@ authAxios.interceptors.response.use(
     const serverMsg = err.response?.data?.message || err.response?.data?.error;
 
     if (!err.response) {
-      err.userMessage = 'Impossible de contacter le serveur. Vérifiez votre connexion.';
+      err.userMessage = 'Impossible de contacter le serveur. Verifiez votre connexion.';
     } else if (status === 401 || status === 403) {
       err.userMessage = "Nom d'utilisateur ou mot de passe incorrect";
     } else if (status === 400) {
-      err.userMessage = serverMsg || 'Données invalides.';
+      err.userMessage = serverMsg || 'Donnees invalides.';
     } else if (status === 404) {
       err.userMessage = 'Compte introuvable.';
     } else if (status === 429) {
-      err.userMessage = 'Trop de tentatives. Réessayez plus tard.';
+      err.userMessage = 'Trop de tentatives. Reessayez plus tard.';
     } else if (status === 422) {
-      err.userMessage = serverMsg || 'Format de données invalide.';
+      err.userMessage = serverMsg || 'Format de donnees invalide.';
     } else {
-      err.userMessage = serverMsg || 'Erreur serveur. Réessayez.';
+      err.userMessage = serverMsg || 'Erreur serveur. Reessayez.';
     }
 
     return Promise.reject(err);
@@ -93,7 +89,11 @@ export const authAPI = {
     authAxios.post('/auth/reset-password', { code, newPassword }),
 };
 
-// ── Resources ─────────────────────────────────────────────────
+export const catalogueAPI = {
+  getAll:  ()   => api.get('/catalogue'),
+  getById: (id) => api.get(`/catalogue/${id}`),
+};
+
 export const bateauxAPI = {
   getAll:  ()           => api.get('/bateaux'),
   getById: (id)         => api.get(`/bateaux/${id}`),

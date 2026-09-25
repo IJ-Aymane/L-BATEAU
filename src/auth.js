@@ -11,11 +11,16 @@ const ROLE_ALIASES = {
   STAFF: 'MANAGER',
   TECH: 'TECHNICIAN',
   TECHNICIEN: 'TECHNICIAN',
-  ROLE_CLIENT: 'CLIENT',
-  ROLE_MANAGER: 'MANAGER',
-  ROLE_TECHNICIAN: 'TECHNICIAN',
-  ROLE_ADMIN: 'ADMIN',
+  CLIENT: 'CLIENT',
+  MANAGER: 'MANAGER',
+  TECHNICIAN: 'TECHNICIAN',
+  ADMIN: 'ADMIN',
 };
+
+const SESSION_KEYS = ['jwt_token', 'user_role', 'user_profile'];
+const stores = () => [localStorage, sessionStorage];
+
+const getStoredValue = (key) => stores().map((store) => store.getItem(key)).find(Boolean) || '';
 
 export const normalizeRole = (value) => {
   if (!value) return '';
@@ -35,6 +40,19 @@ export const decodeJwt = (token) => {
   }
 };
 
+export const getStoredToken = () => getStoredValue('jwt_token');
+
+export const isTokenExpired = (token = getStoredToken()) => {
+  const payload = decodeJwt(token);
+  if (!payload.exp) return true;
+  return Date.now() >= payload.exp * 1000;
+};
+
+export const hasValidToken = () => {
+  const token = getStoredToken();
+  return Boolean(token && !isTokenExpired(token));
+};
+
 export const extractRole = (source = {}) => {
   const tokenPayload = source.token ? decodeJwt(source.token) : {};
   const merged = { ...tokenPayload, ...source };
@@ -45,26 +63,31 @@ export const extractRole = (source = {}) => {
     return normalizeRole(role);
   }).find(Boolean);
 
-  return found || 'ADMIN';
+  return found || '';
 };
 
-export const saveSession = ({ token, role, user } = {}) => {
-  if (token) localStorage.setItem('jwt_token', token);
-  if (role) localStorage.setItem('user_role', normalizeRole(role));
-  if (user) localStorage.setItem('user_profile', JSON.stringify(user));
+export const saveSession = ({ token, role, user, remember = true } = {}) => {
+  clearSession();
+  const store = remember ? localStorage : sessionStorage;
+  if (token) store.setItem('jwt_token', token);
+  if (role) store.setItem('user_role', normalizeRole(role));
+  if (user) store.setItem('user_profile', JSON.stringify(user));
 };
 
 export const clearSession = () => {
-  localStorage.removeItem('jwt_token');
-  localStorage.removeItem('user_role');
-  localStorage.removeItem('user_profile');
+  stores().forEach((store) => SESSION_KEYS.forEach((key) => store.removeItem(key)));
 };
 
-export const getStoredRole = () => normalizeRole(localStorage.getItem('user_role')) || 'ADMIN';
+export const getStoredRole = () => {
+  const stored = normalizeRole(getStoredValue('user_role'));
+  if (stored) return stored;
+  return extractRole({ token: getStoredToken() });
+};
 
-export const getRoleHome = (role = getStoredRole()) => ROLE_HOME[normalizeRole(role)] || '/admin/dashboard';
+export const getRoleHome = (role = getStoredRole()) => ROLE_HOME[normalizeRole(role)] || '/connexion';
 
 export const roleCanAccess = (allowedRoles = []) => {
+  if (!hasValidToken()) return false;
   if (!allowedRoles.length) return true;
   const role = getStoredRole();
   return allowedRoles.map(normalizeRole).includes(role);

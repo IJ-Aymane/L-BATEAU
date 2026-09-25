@@ -49,7 +49,16 @@ export default function Login() {
       if (!token) throw new Error('missing token');
 
       const role = extractRole({ ...payload, token });
-      saveSession({ token, role, user: payload.user || { username: login.username.trim(), role } });
+      saveSession({
+        token,
+        role,
+        remember: login.remember,
+        user: payload.user || {
+          username: payload.username || login.username.trim(),
+          roles: payload.roles || [],
+          role,
+        },
+      });
 
       if (login.remember) localStorage.setItem('remember_username', login.username.trim());
       else localStorage.removeItem('remember_username');

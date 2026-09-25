@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import api, { bateauxAPI, clientsAPI, reservationsAPI } from '../api';
+import api, { bateauxAPI, catalogueAPI, clientsAPI, reservationsAPI } from '../api';
 
 const heroImage = 'img/auth-hero.png';
 
@@ -680,7 +680,7 @@ function ManualBookingPage() {
 export function CataloguePage() {
   const [equipment, setEquipment] = useState(fallbackEquipment);
   const [filters, setFilters] = useState({ category: 'ALL', date: todayKey(), time: '10:00', group: 2, price: 1500 });
-  useEffect(() => { bateauxAPI.getAll().then((res) => { const rows = unwrap(res); if (rows.length) setEquipment(rows); }).catch(() => {}); }, []);
+  useEffect(() => { catalogueAPI.getAll().then((res) => { const rows = unwrap(res); if (rows.length) setEquipment(rows); }).catch(() => {}); }, []);
   const categories = ['ALL', ...new Set(equipment.map((item) => item.type || 'Autre'))];
   const filtered = equipment.filter((item) => (filters.category === 'ALL' || item.type === filters.category) && Number(item.capaciteMax || 0) >= Number(filters.group) && Number(item.prixParHeure || 0) <= Number(filters.price));
 
@@ -726,7 +726,7 @@ function EquipmentCard({ item }) {
 export function CatalogueDetailPage() {
   const { id } = useParams();
   const [item, setItem] = useState(fallbackEquipment.find((x) => x.id === id) || fallbackEquipment[0]);
-  useEffect(() => { if (id) bateauxAPI.getById(id).then((res) => setItem(res.data)).catch(() => {}); }, [id]);
+  useEffect(() => { if (id) catalogueAPI.getById(id).then((res) => setItem(res.data)).catch(() => {}); }, [id]);
   return (
     <div className="public-page">
       <PublicHeader />
