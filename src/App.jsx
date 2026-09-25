@@ -13,6 +13,7 @@ import {
   CataloguePage,
   ClientAccountPage,
   ContactPage,
+  HomePage,
   ManagerPlanning,
   ReservationDetail,
   ReservationTunnelPage,
@@ -21,6 +22,7 @@ import {
 import './App.css';
 
 const shelllessRoutes = [
+  '/',
   '/login',
   '/connexion',
   '/forgot-password',
@@ -51,6 +53,7 @@ function canSee(item, role) {
 function ShelllessRoutes() {
   return (
     <Routes>
+      <Route path="/" element={<HomePage />} />
       <Route path="/login" element={<Login />} />
       <Route path="/connexion" element={<Login />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />

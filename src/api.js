@@ -123,6 +123,7 @@ export const reservationsAPI = {
   getByUser:   (userId)       => api.get(`/reservations/user/${userId}`),
   getByClient: (clientId)     => api.get(`/reservations/client/${clientId}`),
   getInvoice:  (id)           => api.get(`/reservations/${id}/invoice`),
+  getUsers:    ()             => api.get('/reservations/users'),
   create:      (data)         => api.post('/reservations', data),
   update:      (id, data)     => api.put(`/reservations/${id}`, data),
   delete:      (id)           => api.delete(`/reservations/${id}`),

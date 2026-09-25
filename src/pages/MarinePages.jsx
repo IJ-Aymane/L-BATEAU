@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Link, useParams, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import api, { bateauxAPI, catalogueAPI, clientsAPI, reservationsAPI, usersAPI } from '../api';
 import { getStoredUser } from '../auth';
 
@@ -54,7 +54,11 @@ const isClientAccount = (user) => {
 };
 
 const hasValue = (value) => value !== undefined && value !== null && value !== '';
-const boatImage = (item) => item?.imageUrl || item?.photoUrl || item?.photo || item?.image || '';
+const boatImages = (item) => {
+  const urls = Array.isArray(item?.imageUrls) ? item.imageUrls.filter(Boolean) : [];
+  return Array.from(new Set([...urls, item?.imageUrl, item?.photoUrl, item?.photo, item?.image].filter(Boolean)));
+};
+const boatImage = (item) => boatImages(item)[0] || '';
 const priceLabel = (value) => hasValue(value) ? `${money(value)}/h` : 'Tarif non renseigné';
 
 const readImageAsDataUrl = (file) => new Promise((resolve, reject) => {
@@ -177,10 +181,11 @@ function BrandLogo({ className = '' }) {
 function PublicHeader() {
   return (
     <header className="public-header">
-      <Link className="public-brand" to="/catalogue" aria-label="Blue Lagoon Marine">
+      <Link className="public-brand" to="/" aria-label="Blue Lagoon Marine">
         <BrandLogo />
       </Link>
       <nav className="public-nav">
+        <Link to="/">Accueil</Link>
         <Link to="/catalogue">Catalogue</Link>
         <Link to="/contact">Contact</Link>
         <Link className="btn btn-primary btn-sm" to="/connexion">Se connecter</Link>
@@ -238,6 +243,65 @@ function useFleetData() {
     return () => window.clearTimeout(id);
   }, [load]);
   return { ...state, reload: load };
+}
+
+export function HomePage() {
+  const gallery = [
+    'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1100&q=80',
+    'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=1100&q=80',
+    'https://images.unsplash.com/photo-1500375592092-40eb2168fd21?auto=format&fit=crop&w=1100&q=80',
+  ];
+
+  return (
+    <div className="public-page home-page">
+      <PublicHeader />
+      <section className="home-hero">
+        <video autoPlay muted loop playsInline poster="/img/auth-hero.png">
+          <source src="https://videos.pexels.com/video-files/3765078/3765078-uhd_2560_1440_30fps.mp4" type="video/mp4" />
+        </video>
+        <div className="home-hero-copy">
+          <span className="eyebrow">Blue Lagoon Marine</span>
+          <h1>Location de bateaux, réservations et aventures en mer.</h1>
+          <p>Une expérience nautique propre, rapide et élégante: flotte, créneaux, factures et accès client dans un seul espace.</p>
+          <div className="home-actions">
+            <Link className="btn btn-primary" to="/connexion">Se connecter</Link>
+            <Link className="btn btn-secondary" to="/catalogue">Voir les bateaux</Link>
+          </div>
+        </div>
+      </section>
+
+      <main className="public-main home-content">
+        <section className="home-welcome">
+          <div>
+            <span className="eyebrow">Bienvenue</span>
+            <h2>Votre base nautique digitale</h2>
+            <p>Réservez un bateau, confirmez un créneau, suivez vos factures et profitez d'une gestion claire pour les clients comme pour l'équipe.</p>
+          </div>
+          <div className="home-stat-row">
+            <div><strong>20%</strong><span>TVA facture</span></div>
+            <div><strong>24h</strong><span>Planning lisible</span></div>
+            <div><strong>PDF</strong><span>Factures prêtes</span></div>
+          </div>
+        </section>
+
+        <section className="home-media-grid">
+          {gallery.map((src, index) => <img key={src} src={src} alt={`Expérience nautique ${index + 1}`} />)}
+        </section>
+
+        <section className="home-split">
+          <div>
+            <span className="eyebrow">Expérience</span>
+            <h2>Mer, bateau, planning et facture dans le même flux.</h2>
+            <p>Le client choisit son bateau et son horaire. L'équipe garde la main sur les réservations manuelles, l'avance, le reste à payer et l'impression de facture.</p>
+            <Link className="btn btn-primary" to="/reservation/tunnel">Réserver maintenant</Link>
+          </div>
+          <video controls poster="/img/auth-hero.png">
+            <source src="https://videos.pexels.com/video-files/3571264/3571264-hd_1920_1080_30fps.mp4" type="video/mp4" />
+          </video>
+        </section>
+      </main>
+    </div>
+  );
 }
 
 export function ContactPage() {
@@ -474,7 +538,8 @@ export function AdminFleet() {
       permis: boat.permis || '',
       description: boat.description || '',
       statut: boat.statut || (boat.disponible === false ? 'HORS_SERVICE' : 'ACTIVE'),
-      imageUrl: boat.imageUrl || '',
+      imageUrls: boatImages(boat),
+      imageUrl: boatImage(boat),
     });
     setDrawer(boat.id ? boat : { id: null });
   };
@@ -485,6 +550,8 @@ export function AdminFleet() {
       capaciteMax: Number(form.capaciteMax || 0),
       prixParHeure: Number(form.prixParHeure || 0),
       disponible: Boolean(form.disponible),
+      imageUrls: form.imageUrls || [],
+      imageUrl: (form.imageUrls || [])[0] || '',
       statut: form.statut || (form.disponible ? 'ACTIVE' : 'HORS_SERVICE'),
     };
     try {
@@ -498,15 +565,25 @@ export function AdminFleet() {
   };
 
   const handleImageUpload = async (event) => {
-    const file = event.target.files?.[0];
+    const files = Array.from(event.target.files || []);
     event.target.value = '';
-    if (!file) return;
+    if (!files.length) return;
     try {
-      const imageUrl = await readImageAsDataUrl(file);
-      setForm((prev) => ({ ...prev, imageUrl }));
+      const uploaded = await Promise.all(files.map(readImageAsDataUrl));
+      setForm((prev) => {
+        const imageUrls = [...(prev.imageUrls || []), ...uploaded].filter(Boolean);
+        return { ...prev, imageUrls, imageUrl: imageUrls[0] || '' };
+      });
     } catch (err) {
       alert(err.message || 'Impossible de charger cette image.');
     }
+  };
+
+  const removeImage = (index) => {
+    setForm((prev) => {
+      const imageUrls = (prev.imageUrls || []).filter((_, i) => i !== index);
+      return { ...prev, imageUrls, imageUrl: imageUrls[0] || '' };
+    });
   };
 
   const retire = async (boat) => {
@@ -581,7 +658,7 @@ export function AdminFleet() {
             <div className="drawer-section"><h3>Specs techniques</h3><label>ID interne<input value={form.internalId} onChange={(e) => setForm({ ...form, internalId: e.target.value })} /></label><label>Capacité<input type="number" value={form.capaciteMax} onChange={(e) => setForm({ ...form, capaciteMax: e.target.value })} /></label><label>Puissance<input value={form.puissance} onChange={(e) => setForm({ ...form, puissance: e.target.value })} /></label></div>
             <div className="drawer-section"><h3>Usage & tarifs</h3><label>Permis requis<input value={form.permis} onChange={(e) => setForm({ ...form, permis: e.target.value })} /></label><label>Tarif de base / heure<input type="number" value={form.prixParHeure} onChange={(e) => setForm({ ...form, prixParHeure: e.target.value })} /></label><label className="check-row"><input type="checkbox" checked={form.disponible} onChange={(e) => setForm({ ...form, disponible: e.target.checked })} /> Disponible</label></div>
             <div className="drawer-section"><h3>Description commerciale</h3><textarea rows="5" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} /></div>
-            <div className="drawer-section"><h3>Galerie photos</h3><div className="photo-strip">{form.imageUrl ? <img src={form.imageUrl} alt="Aperçu équipement" /> : <div className="image-placeholder"><span>Photo</span></div>}<label className="btn btn-secondary btn-sm">Ajouter<input type="file" accept="image/*" hidden onChange={handleImageUpload} /></label>{form.imageUrl && <button type="button" onClick={() => setForm({ ...form, imageUrl: '' })}>Retirer</button>}</div></div>
+            <div className="drawer-section"><h3>Galerie photos</h3><div className="photo-strip multi">{(form.imageUrls || []).length ? form.imageUrls.map((url, index) => <span className="photo-item" key={`${url}-${index}`}><img src={url} alt={`Photo ${index + 1}`} />{index === 0 && <em>Principale</em>}<button type="button" onClick={() => removeImage(index)}>×</button></span>) : <div className="image-placeholder"><span>Photo</span></div>}<label className="btn btn-secondary btn-sm">Ajouter<input type="file" accept="image/*" multiple hidden onChange={handleImageUpload} /></label></div></div>
             <button className="btn btn-primary" onClick={save}>Sauvegarder</button>
           </aside>
         </div>
@@ -774,8 +851,8 @@ export function ManagerPlanning() {
   const [view, setView] = useState('day');
   const [category, setCategory] = useState('ALL');
   const [query, setQuery] = useState('');
-  const [draft, setDraft] = useState(null);
   const [drag, setDrag] = useState(null);
+  const navigate = useNavigate();
   const hours = Array.from({ length: 13 }, (_, i) => i + 8);
   const categories = ['ALL', ...new Set(boats.map((b) => b.type || 'Autre'))];
   const equipment = boats.filter((b) => (category === 'ALL' || b.type === category) && `${b.nom} ${b.type}`.toLowerCase().includes(query.toLowerCase()));
@@ -809,7 +886,7 @@ export function ManagerPlanning() {
 
   return (
     <div>
-      <PageIntro eyebrow="Manager" title="Planning interactif" action={<button className="btn btn-primary" onClick={() => setDraft({ step: 1 })}>+ Nouvelle réservation</button>}>
+      <PageIntro eyebrow="Manager" title="Planning interactif" action={<Link className="btn btn-primary" to="/manager/reservations/new">+ Nouvelle réservation</Link>}>
         Vue opérationnelle avec rafraîchissement automatique toutes les 30 secondes.
       </PageIntro>
       <div className="toolbar planning-toolbar card">
@@ -826,7 +903,7 @@ export function ManagerPlanning() {
             <div className="timeline-row" key={boat.id}>
               <strong>{boat.nom}<small>{boat.type}</small></strong>
               <div className="timeline-cells">
-                {hours.map((h) => <button key={h} onClick={() => setDraft({ boatId: boat.id, hour: h, step: 1 })} onDragOver={(e) => e.preventDefault()} onDrop={() => dropBooking(boat.id, h)} />)}
+                {hours.map((h) => <button key={h} onClick={() => navigate(`/manager/reservations/new?bateauId=${boat.id}&date=${date}&time=${String(h).padStart(2, '0')}:00`)} onDragOver={(e) => e.preventDefault()} onDrop={() => dropBooking(boat.id, h)} />)}
                 {blocksFor(boat.id).map((r) => (
                   <Link draggable onDragStart={() => setDrag(r)} to={`/manager/reservations/${r.id}`} key={r.id} className={`booking-block ${statusBadge(r.statut)}`} style={blockStyle(r)}>
                     {clients.find((c) => c.id === r.clientId)?.nomComplet || r.clientName || r.username || '-'} · {r.nbHeures || '-'}h
@@ -843,25 +920,153 @@ export function ManagerPlanning() {
           <div><span>Arrivées &lt; 1h</span><strong>{dayReservations.filter((r) => Math.abs(new Date(r.dateDebut) - new Date()) < 3600000).length}</strong></div>
         </aside>
       </div>
-      {draft && <ManualBookingModal initial={draft} onClose={() => setDraft(null)} />}
     </div>
   );
 }
 
-function ManualBookingModal({ initial, onClose }) {
-  const [step, setStep] = useState(initial.step || 1);
-  const [client, setClient] = useState('');
-  const [slot, setSlot] = useState({ boatId: initial.boatId || '', hour: initial.hour || 10 });
-  const [payment, setPayment] = useState('CMI');
+function ReservationForm({ initial = {}, compact = false, onCreated }) {
+  const [searchParams] = useSearchParams();
+  const [users, setUsers] = useState([]);
+  const [boats, setBoats] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
+  const [invoice, setInvoice] = useState(null);
+  const [created, setCreated] = useState(null);
+  const [form, setForm] = useState({
+    userId: initial.userId || searchParams.get('userId') || '',
+    bateauId: initial.boatId || initial.bateauId || searchParams.get('bateauId') || '',
+    date: initial.date || searchParams.get('date') || todayKey(),
+    time: initial.time || searchParams.get('time') || (initial.hour ? `${String(initial.hour).padStart(2, '0')}:00` : '10:00'),
+    nombreHeures: initial.nombreHeures || 2,
+    montantAvance: initial.montantAvance || 0,
+  });
+
+  useEffect(() => {
+    let active = true;
+    setLoading(true);
+    Promise.allSettled([reservationsAPI.getUsers(), bateauxAPI.getAll()])
+      .then(([u, b]) => {
+        if (!active) return;
+        const userRows = u.status === 'fulfilled' ? unwrap(u.value) : [];
+        const boatRows = b.status === 'fulfilled' ? unwrap(b.value) : [];
+        setUsers(userRows);
+        setBoats(boatRows);
+        setForm((prev) => ({
+          ...prev,
+          userId: prev.userId || userRows[0]?.id || '',
+          bateauId: prev.bateauId || boatRows[0]?.id || '',
+        }));
+        if (u.status === 'rejected') setError(u.reason?.userMessage || 'Impossible de charger les clients.');
+        else if (b.status === 'rejected') setError(b.reason?.userMessage || 'Impossible de charger les bateaux.');
+      })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, []);
+
+  const selectedBoat = boats.find((boat) => String(boat.id) === String(form.bateauId));
+  const hours = Math.max(1, Number(form.nombreHeures || 1));
+  const prixHT = Number(selectedBoat?.prixParHeure || 0) * hours;
+  const tva = prixHT * 0.2;
+  const totalTTC = prixHT + tva;
+  const avance = Math.max(0, Math.min(Number(form.montantAvance || 0), totalTTC));
+  const reste = Math.max(0, totalTTC - avance);
+  const canSubmit = Boolean(form.userId && form.bateauId && form.date && form.time && hours > 0 && !submitting && !loading);
+
+  const setField = (field, value) => {
+    setError('');
+    setForm((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const submit = async (event) => {
+    event.preventDefault();
+    if (!canSubmit) return;
+    setSubmitting(true);
+    setError('');
+    setCreated(null);
+    setInvoice(null);
+
+    try {
+      const payload = {
+        userId: form.userId,
+        bateauId: form.bateauId,
+        dateDebut: `${form.date}T${form.time}:00`,
+        nombreHeures: hours,
+        montantAvance: avance,
+      };
+      const res = await reservationsAPI.create(payload);
+      const saved = res.data;
+      setCreated(saved);
+      const invoiceRes = await reservationsAPI.getInvoice(saved.id);
+      setInvoice(invoiceRes.data);
+      onCreated?.(saved, invoiceRes.data);
+    } catch (err) {
+      setError(err.userMessage || 'Créneau indisponible pour ce bateau.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   return (
-    <div className="modal-overlay">
-      <div className="modal wizard-modal">
-        <div className="section-head"><h2>Nouvelle réservation</h2><button onClick={onClose}>Fermer</button></div>
-        <div className="stepper"><span className={step >= 1 ? 'active' : ''}>Client</span><span className={step >= 2 ? 'active' : ''}>Créneau</span><span className={step >= 3 ? 'active' : ''}>Paiement</span></div>
-        {step === 1 && <div className="drawer-section"><label>Téléphone ou email<input value={client} onChange={(e) => setClient(e.target.value)} placeholder="+212..." /></label><button className="btn btn-primary" onClick={() => setStep(2)} disabled={!client}>Continuer</button></div>}
-        {step === 2 && <div className="drawer-section"><label>Équipement<input value={slot.boatId} onChange={(e) => setSlot({ ...slot, boatId: e.target.value })} /></label><label>Heure<input type="number" value={slot.hour} onChange={(e) => setSlot({ ...slot, hour: e.target.value })} /></label><button className="btn btn-primary" onClick={() => setStep(3)}>Continuer</button></div>}
-        {step === 3 && <div className="drawer-section"><label>Méthode<select value={payment} onChange={(e) => setPayment(e.target.value)}><option>CMI</option><option>Espèces</option><option>Virement</option></select></label><button className="btn btn-primary" onClick={onClose}>Confirmer</button></div>}
-      </div>
+    <div className={`reservation-form-layout ${compact ? 'compact' : ''}`}>
+      <form className="card form-card reservation-form" onSubmit={submit}>
+        <div className="section-head">
+          <div>
+            <span className="eyebrow">Réservation</span>
+            <h2>Nouvelle réservation</h2>
+          </div>
+          {created && <span className="badge badge-success">{created.statut}</span>}
+        </div>
+        {error && <div className="notice error" role="alert">{error}</div>}
+        <div className="form-grid two">
+          <label>Client
+            <select value={form.userId} onChange={(e) => setField('userId', e.target.value)} disabled={loading} required>
+              <option value="">Sélectionner un client</option>
+              {users.map((user) => <option key={user.id} value={user.id}>{user.username}</option>)}
+            </select>
+          </label>
+          <label>Bateau
+            <select value={form.bateauId} onChange={(e) => setField('bateauId', e.target.value)} disabled={loading} required>
+              <option value="">Sélectionner un bateau</option>
+              {boats.map((boat) => <option key={boat.id} value={boat.id}>{boat.nom} · {priceLabel(boat.prixParHeure)}</option>)}
+            </select>
+          </label>
+          <label>Date
+            <input type="date" value={form.date} onChange={(e) => setField('date', e.target.value)} required />
+          </label>
+          <label>Heure
+            <input type="time" value={form.time} onChange={(e) => setField('time', e.target.value)} required />
+          </label>
+          <label>Combien d'heures
+            <input type="number" min="1" max="24" value={form.nombreHeures} onChange={(e) => setField('nombreHeures', e.target.value)} required />
+          </label>
+          <label>Avance
+            <input type="number" min="0" max={Math.ceil(totalTTC)} value={form.montantAvance} onChange={(e) => setField('montantAvance', e.target.value)} />
+          </label>
+        </div>
+        <button className="btn btn-primary" disabled={!canSubmit}>{submitting ? 'Création...' : 'Créer la réservation'}</button>
+      </form>
+
+      <aside className="card price-breakdown">
+        <h2>Calcul facture</h2>
+        {selectedBoat && <p>{selectedBoat.nom} · {money(selectedBoat.prixParHeure)} / heure</p>}
+        <div><span>Total HT</span><strong>{money(prixHT)}</strong></div>
+        <div><span>TVA 20%</span><strong>{money(tva)}</strong></div>
+        <div><span>Total TTC</span><strong>{money(totalTTC)}</strong></div>
+        <div><span>Avance</span><strong>{money(avance)}</strong></div>
+        <div><span>Reste</span><strong>{money(reste)}</strong></div>
+      </aside>
+
+      {invoice && <InvoicePanel invoice={invoice} onPrint={() => window.print()} />}
+    </div>
+  );
+}
+
+function ManualBookingPage() {
+  return (
+    <div>
+      <PageIntro eyebrow="Manager" title="Réservation manuelle">Un seul formulaire pour sélectionner le client, le bateau, le créneau, l'avance et générer la facture.</PageIntro>
+      <ReservationForm />
     </div>
   );
 }
@@ -890,15 +1095,6 @@ export function ReservationDetail() {
       </div>
       <div className="card action-bar">{actions.map((action) => <button key={action} className="btn btn-secondary" onClick={() => { if (action === 'Confirm') setStatus('CONFIRMED'); if (action === 'Generate Invoice') downloadInvoicePdf({ reservation: { ...reservation, statut: status }, client, boat }); }}>{action}</button>)}</div>
       <div className="card timeline"><h2>Audit timeline</h2><div><span>{fmtDate(reservation.dateDebut)}</span><strong>Réservation créée</strong><em>{status}</em></div><div><span>Aujourd'hui</span><strong>Consultation manager</strong><em>Journal</em></div></div>
-    </div>
-  );
-}
-
-function ManualBookingPage() {
-  return (
-    <div>
-      <PageIntro eyebrow="Manager" title="Réservation manuelle">Créez une réservation en trois étapes depuis le back-office.</PageIntro>
-      <ManualBookingModal initial={{ step: 1 }} onClose={() => window.history.back()} />
     </div>
   );
 }
@@ -985,40 +1181,45 @@ export function CatalogueDetailPage() {
 
 function InvoicePanel({ invoice, onPrint }) {
   if (!invoice) return null;
+  const startDate = fmtDate(invoice.dateDebut);
+  const startTime = fmtTime(invoice.dateDebut);
+  const endTime = fmtTime(invoice.dateFin);
+
   return (
     <section className="card invoice-panel">
-      <div className="section-head">
+      <div className="section-head invoice-head">
         <div>
           <span className="eyebrow">Facture</span>
           <h2>{invoice.reference || 'Facture réservation'}</h2>
+          <p>Blue Lagoon Marine · ICE 003082242000034</p>
         </div>
         <button className="btn btn-secondary" type="button" onClick={onPrint}>Imprimer</button>
       </div>
-      <div className="invoice-grid">
-        <div>
-          <span>Client</span>
-          <strong>{invoice.client?.username || '-'}</strong>
-          <p>{invoice.client?.email || invoice.client?.telephone || '-'}</p>
-        </div>
-        <div>
-          <span>Bateau</span>
-          <strong>{invoice.bateau?.nom || '-'}</strong>
-          <p>{invoice.bateau?.type || invoice.bateau?.marque || '-'}</p>
-        </div>
-        <div>
-          <span>Créneau</span>
-          <strong>{fmtDate(invoice.dateDebut)} · {fmtTime(invoice.dateDebut)}</strong>
-          <p>{invoice.nombreHeures}h, retour {fmtTime(invoice.dateFin)}</p>
-        </div>
-        <div>
-          <span>Paiement</span>
-          <strong>{invoice.paymentStatus || 'PENDING'}</strong>
-          <p>{invoice.statut || '-'}</p>
-        </div>
+
+      <div className="invoice-meta">
+        <div><span>Client</span><strong>{invoice.client?.username || '-'}</strong><p>{invoice.client?.email || invoice.client?.telephone || '-'}</p></div>
+        <div><span>Bateau</span><strong>{invoice.bateau?.nom || '-'}</strong><p>{invoice.bateau?.type || invoice.bateau?.marque || '-'}</p></div>
+        <div><span>Statut paiement</span><strong>{invoice.paymentStatus || 'PENDING'}</strong><p>{invoice.statut || '-'}</p></div>
       </div>
-      <div className="invoice-total">
-        <span>Sous-total</span><strong>{money(invoice.subtotal)}</strong>
-        <span>Total</span><strong>{money(invoice.totalPrice)}</strong>
+
+      <div className="invoice-table-wrap">
+        <table className="invoice-table">
+          <thead><tr><th>Désignation</th><th>Unité</th><th>Qte</th><th>P.U</th><th>Montants</th></tr></thead>
+          <tbody>
+            <tr>
+              <td><strong>Location du bateau</strong><br />Date: {startDate}<br />Horaire: {startTime}-{endTime}</td>
+              <td>H</td>
+              <td>{invoice.nombreHeures}</td>
+              <td>{money(invoice.prixParHeure)}</td>
+              <td>{money(invoice.subtotal)}</td>
+            </tr>
+            <tr><td colSpan="4"><strong>Total HT</strong></td><td>{money(invoice.subtotal)}</td></tr>
+            <tr><td colSpan="4"><strong>TVA 20%</strong></td><td>{money(invoice.tva)}</td></tr>
+            <tr><td colSpan="4"><strong>Total TTC</strong></td><td>{money(invoice.totalPrice)}</td></tr>
+            <tr><td colSpan="4"><strong>Avance</strong></td><td>{money(invoice.montantAvance)}</td></tr>
+            <tr><td colSpan="4"><strong>Reste</strong></td><td>{money(invoice.montantRestant)}</td></tr>
+          </tbody>
+        </table>
       </div>
     </section>
   );
@@ -1038,6 +1239,7 @@ export function ReservationTunnelPage() {
     date: todayKey(),
     time: '10:00',
     nombreHeures: 2,
+    montantAvance: 0,
   });
 
   useEffect(() => {
@@ -1057,7 +1259,11 @@ export function ReservationTunnelPage() {
 
   const selectedBoat = boats.find((boat) => String(boat.id) === String(form.bateauId));
   const hours = Math.max(1, Number(form.nombreHeures || 1));
-  const pricePreview = Number(selectedBoat?.prixParHeure || 0) * hours;
+  const prixHT = Number(selectedBoat?.prixParHeure || 0) * hours;
+  const tva = prixHT * 0.2;
+  const pricePreview = prixHT + tva;
+  const avance = Math.max(0, Math.min(Number(form.montantAvance || 0), pricePreview));
+  const reste = Math.max(0, pricePreview - avance);
   const canSubmit = Boolean(currentUser?.id && form.bateauId && form.date && form.time && hours > 0 && !submitting);
 
   const setField = (field, value) => {
@@ -1084,6 +1290,7 @@ export function ReservationTunnelPage() {
         bateauId: form.bateauId,
         dateDebut: `${form.date}T${form.time}:00`,
         nombreHeures: hours,
+        montantAvance: avance,
       };
       const created = await reservationsAPI.create(payload);
       const savedReservation = created.data;
@@ -1134,14 +1341,23 @@ export function ReservationTunnelPage() {
               </label>
             </div>
 
-            <label>Nombre d'heures
-              <input type="number" min="1" max="24" value={form.nombreHeures} onChange={(e) => setField('nombreHeures', e.target.value)} required />
-            </label>
+            <div className="form-grid two">
+              <label>Nombre d'heures
+                <input type="number" min="1" max="24" value={form.nombreHeures} onChange={(e) => setField('nombreHeures', e.target.value)} required />
+              </label>
+              <label>Avance
+                <input type="number" min="0" max={Math.ceil(pricePreview)} value={form.montantAvance} onChange={(e) => setField('montantAvance', e.target.value)} />
+              </label>
+            </div>
 
             <div className="price-preview">
-              <span>Total estimé</span>
+              <span>Total TTC estimé</span>
               <strong>{money(pricePreview)}</strong>
-              <small>{selectedBoat ? `${money(selectedBoat.prixParHeure)} x ${hours}h` : 'Choisissez un bateau pour calculer le prix.'}</small>
+              <small>{selectedBoat ? `${money(selectedBoat.prixParHeure)} x ${hours}h + TVA 20%` : 'Choisissez un bateau pour calculer le prix.'}</small>
+              <div><span>HT</span><strong>{money(prixHT)}</strong></div>
+              <div><span>TVA</span><strong>{money(tva)}</strong></div>
+              <div><span>Avance</span><strong>{money(avance)}</strong></div>
+              <div><span>Reste</span><strong>{money(reste)}</strong></div>
             </div>
 
             <button className="btn btn-primary" type="submit" disabled={!canSubmit}>
@@ -1157,7 +1373,9 @@ export function ReservationTunnelPage() {
             <p>{selectedBoat.type || '-'} · {selectedBoat.capaciteMax || '-'} pers.</p>
             <div><span>Tarif horaire</span><strong>{money(selectedBoat.prixParHeure)}</strong></div>
             <div><span>Durée</span><strong>{hours}h</strong></div>
-            <div><span>Total</span><strong>{money(pricePreview)}</strong></div>
+            <div><span>Total TTC</span><strong>{money(pricePreview)}</strong></div>
+            <div><span>Avance</span><strong>{money(avance)}</strong></div>
+            <div><span>Reste</span><strong>{money(reste)}</strong></div>
           </> : <EmptyState title="Aucun bateau" message="Ajoutez des bateaux disponibles dans la base." />}
         </aside>
 
