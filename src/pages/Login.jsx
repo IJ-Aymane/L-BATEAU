@@ -45,7 +45,7 @@ export default function Login() {
 
         <div className="login-brand">
           <span className="login-brand-icon">⚓</span>
-          <div className="login-brand-name">L'BATEAU</div>
+          <div className="login-brand-name">Blue lagoon marine</div>
           <div className="login-brand-sub">Management System</div>
         </div>
 
