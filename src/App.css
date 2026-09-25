@@ -338,6 +338,8 @@ tr:last-child td { border-bottom: 0; }
 .client-list { display: grid; gap: 8px; margin-top: 14px; }
 .client-list button { border: 1px solid var(--border); background: #fff; border-radius: 10px; padding: 12px; text-align: left; display: grid; gap: 4px; cursor: pointer; }
 .reservation-cards { display: grid; gap: 14px; }
+.empty-reservations { padding: 24px; display: grid; gap: 12px; justify-items: start; }
+.empty-reservations p { max-width: 560px; }
 .reservation-card { padding: 18px; display: flex; align-items: center; justify-content: space-between; gap: 18px; }
 .review-card { padding: 20px; display: grid; gap: 12px; }
 .split-grid > .card:not(.responsive-table), .split-grid > form.card { padding: 18px; }

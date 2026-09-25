@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import api, { bateauxAPI, catalogueAPI, clientsAPI, reservationsAPI, usersAPI } from '../api';
 import { getStoredUser, hasValidToken } from '../auth';
@@ -1443,17 +1443,67 @@ export function ClientAccountPage() {
   const { boats, clients, reservations: allReservations } = useFleetData();
   const [userReservations, setUserReservations] = useState([]);
   const tabs = [['reservations', 'Mes réservations'], ['historique', 'Historique'], ['factures', 'Mes factures'], ['profil', 'Mon profil']];
+  const userReservationKeys = useMemo(() => [...new Set([
+    currentUser?.id,
+    currentUser?._id,
+    currentUser?.userId,
+    currentUser?.clientId,
+    currentUser?.username,
+    currentUser?.email,
+  ].filter(Boolean).map(String))], [
+    currentUser?.id,
+    currentUser?._id,
+    currentUser?.userId,
+    currentUser?.clientId,
+    currentUser?.username,
+    currentUser?.email,
+  ]);
+  const reservationLookupKey = userReservationKeys.join('|');
 
   useEffect(() => {
-    if (!currentUser?.id) return undefined;
-    let active = true;
-    reservationsAPI.getByUser(currentUser.id)
-      .then((res) => { if (active) setUserReservations(unwrap(res)); })
-      .catch(() => { if (active) setUserReservations([]); });
-    return () => { active = false; };
-  }, [currentUser?.id]);
+    if (!userReservationKeys.length) {
+      const id = window.setTimeout(() => setUserReservations([]), 0);
+      return () => window.clearTimeout(id);
+    }
 
-  const reservations = currentUser?.id ? userReservations : allReservations;
+    let active = true;
+    const loadReservations = async () => {
+      for (const key of userReservationKeys) {
+        try {
+          const rows = unwrap(await reservationsAPI.getByUser(key));
+          if (!active) return;
+          if (rows.length || key === userReservationKeys[userReservationKeys.length - 1]) {
+            setUserReservations(rows);
+            return;
+          }
+        } catch {
+          // Try the next identifier shape returned by Mongo/JWT payloads.
+        }
+      }
+      if (active) setUserReservations([]);
+    };
+
+    loadReservations();
+    return () => { active = false; };
+  }, [reservationLookupKey, userReservationKeys]);
+
+  const belongsToCurrentUser = (reservation) => {
+    if (!userReservationKeys.length) return false;
+    return [
+      reservation.userId,
+      reservation.clientId,
+      reservation.user?.id,
+      reservation.user?._id,
+      reservation.client?.id,
+      reservation.client?._id,
+      reservation.username,
+      reservation.userName,
+      reservation.userEmail,
+      reservation.email,
+    ].filter(Boolean).map(String).some((value) => userReservationKeys.includes(value));
+  };
+  const fallbackReservations = currentUser ? allReservations.filter(belongsToCurrentUser) : allReservations;
+  const reservations = currentUser ? (userReservations.length ? userReservations : fallbackReservations) : allReservations;
   const upcoming = reservations.filter((r) => !r.dateDebut || new Date(r.dateDebut) >= new Date());
   const past = reservations.filter((r) => r.dateDebut && new Date(r.dateDebut) < new Date());
   const clientFor = (reservation) => clients.find((client) => client.id === reservation.clientId) || { nomComplet: reservation.clientName || reservation.username, email: reservation.userEmail, telephone: reservation.userTelephone };
@@ -1461,14 +1511,36 @@ export function ClientAccountPage() {
 
   return (
     <div>
-      <PageIntro eyebrow="Compte client" title="Espace personnel">
+      <PageIntro
+        eyebrow="Compte client"
+        title="Espace personnel"
+        action={<Link className="btn btn-primary" to="/catalogue">Nouvelle réservation</Link>}
+      >
         Réservations, factures, avis et préférences de notification.
       </PageIntro>
       <div className="tabs">{tabs.map(([key, label]) => <Link className={tab === key ? 'active' : ''} to={`/compte/${key}`} key={key}>{label}</Link>)}</div>
-      {tab === 'reservations' && <div className="reservation-cards">{!upcoming.length && <EmptyState title="Aucune réservation" message="Vos prochaines réservations apparaîtront ici." />}{upcoming.map((r) => <ReservationCard key={r.id} reservation={r} client={clientFor(r)} boat={boatFor(r)} />)}</div>}
+      {tab === 'reservations' && (
+        <div className="reservation-cards">
+          {!upcoming.length ? <ReservationEmptyState /> : upcoming.map((r) => <ReservationCard key={r.id} reservation={r} client={clientFor(r)} boat={boatFor(r)} />)}
+        </div>
+      )}
       {tab === 'historique' && <div className="reservation-cards">{!past.length && <EmptyState title="Aucun historique" message="Les prestations terminées apparaîtront ici." />}{past.map((r) => <ReservationCard key={r.id} reservation={r} client={clientFor(r)} boat={boatFor(r)} />)}</div>}
       {tab === 'factures' && <div className="card responsive-table"><table><thead><tr><th>Facture</th><th>Date</th><th>Montant</th><th></th></tr></thead><tbody>{reservations.map((r, i) => <tr key={r.id || i}><td>FAC-{i + 1}</td><td>{fmtDate(r.dateDebut)}</td><td>{money(r.montantTotal)}</td><td><button onClick={() => downloadInvoicePdf({ reservation: r, client: clientFor(r), boat: boatFor(r), reference: `FAC-${i + 1}` })}>Télécharger PDF</button></td></tr>)}</tbody></table>{!reservations.length && <EmptyState title="Aucune facture" message="Les factures seront disponibles après une réservation." />}</div>}
       {tab === 'profil' && <div className="card form-card"><h2>Profil</h2><EmptyState title="Profil non chargé" message="Les informations du compte connecté apparaîtront ici quand l’API profil sera disponible." /></div>}
+    </div>
+  );
+}
+
+function ReservationEmptyState() {
+  return (
+    <div className="card empty-reservations">
+      <span className="badge badge-neutral">Mes réservations</span>
+      <h2>Aucune réservation active</h2>
+      <p>Choisissez un équipement dans le catalogue pour créer votre prochaine sortie nautique.</p>
+      <div className="card-actions">
+        <Link className="btn btn-primary" to="/catalogue">Réserver maintenant</Link>
+        <Link className="btn btn-secondary" to="/reservation/tunnel">Ouvrir le tunnel</Link>
+      </div>
     </div>
   );
 }

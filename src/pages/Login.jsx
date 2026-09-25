@@ -49,16 +49,18 @@ export default function Login() {
       if (!token) throw new Error('missing token');
 
       const role = extractRole({ ...payload, token });
+      const profile = payload.user || {};
       saveSession({
         token,
         role,
         remember: login.remember,
-        user: payload.user || {
-          id: payload.id || payload.userId,
-          username: payload.username || login.username.trim(),
-          email: payload.email,
-          telephone: payload.telephone,
-          roles: payload.roles || [],
+        user: {
+          ...profile,
+          id: profile.id || profile._id || profile.userId || payload.id || payload._id || payload.userId,
+          username: profile.username || payload.username || login.username.trim(),
+          email: profile.email || payload.email,
+          telephone: profile.telephone || payload.telephone,
+          roles: profile.roles || payload.roles || [],
           role,
         },
       });
