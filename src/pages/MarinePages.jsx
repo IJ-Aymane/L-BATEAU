@@ -1,50 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import api, { bateauxAPI, catalogueAPI, clientsAPI, reservationsAPI } from '../api';
-
-const heroImage = 'img/auth-hero.png';
-
-const fallbackEquipment = [
-  {
-    id: 'yacht-signature',
-    nom: 'Lagoon Signature',
-    type: 'Yacht',
-    marque: 'Prestige 460',
-    capaciteMax: 10,
-    puissance: '2 x 440 CV',
-    prixParHeure: 1250,
-    disponible: true,
-    note: 4.9,
-  },
-  {
-    id: 'voilier-azur',
-    nom: 'Voilier Azur',
-    type: 'Voilier',
-    marque: 'Beneteau Oceanis',
-    capaciteMax: 8,
-    puissance: '57 CV',
-    prixParHeure: 720,
-    disponible: true,
-    note: 4.8,
-  },
-  {
-    id: 'jet-atlas',
-    nom: 'Jet Atlas',
-    type: 'Jet Ski',
-    marque: 'Sea-Doo GTX',
-    capaciteMax: 2,
-    puissance: '170 CV',
-    prixParHeure: 390,
-    disponible: true,
-    note: 4.7,
-  },
-];
-
-const personnel = [
-  { id: 'p1', name: 'Amine El Idrissi', email: 'amine@bluelagoon.ma', roles: ['ADMIN'], createdAt: '2026-01-12', lastLogin: '2026-09-25', status: 'ACTIF' },
-  { id: 'p2', name: 'Sara Benjelloun', email: 'sara@bluelagoon.ma', roles: ['MANAGER'], createdAt: '2026-02-04', lastLogin: '2026-09-24', status: 'ACTIF' },
-  { id: 'p3', name: 'Youssef Radi', email: 'youssef@bluelagoon.ma', roles: ['TECHNICIAN'], createdAt: '2026-03-18', lastLogin: '2026-09-20', status: 'ACTIF' },
-];
+import api, { bateauxAPI, catalogueAPI, clientsAPI, reservationsAPI, usersAPI } from '../api';
 
 const faqs = [
   ['Quel est l\'âge minimum ?', 'Le conducteur doit avoir 18 ans minimum. Les passagers mineurs sont acceptés avec un adulte responsable.'],
@@ -91,8 +47,130 @@ const equipmentStatus = (item) => {
   return item?.disponible === false ? 'HORS_SERVICE' : 'ACTIVE';
 };
 
+const isClientAccount = (user) => {
+  const roles = user?.roles || [];
+  return roles.length === 1 && roles.includes('ROLE_CLIENT');
+};
+
+const hasValue = (value) => value !== undefined && value !== null && value !== '';
+const boatImage = (item) => item?.imageUrl || item?.photoUrl || item?.photo || item?.image || '';
+const priceLabel = (value) => hasValue(value) ? `${money(value)}/h` : 'Tarif non renseigné';
+
+const readImageAsDataUrl = (file) => new Promise((resolve, reject) => {
+  if (!file) {
+    resolve('');
+    return;
+  }
+  if (!file.type.startsWith('image/')) {
+    reject(new Error('Veuillez choisir une image valide.'));
+    return;
+  }
+
+  const objectUrl = URL.createObjectURL(file);
+  const image = new Image();
+  image.onload = () => {
+    const maxSize = 1200;
+    const ratio = Math.min(1, maxSize / Math.max(image.width, image.height));
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, Math.round(image.width * ratio));
+    canvas.height = Math.max(1, Math.round(image.height * ratio));
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+    URL.revokeObjectURL(objectUrl);
+    resolve(canvas.toDataURL('image/jpeg', 0.78));
+  };
+  image.onerror = () => {
+    URL.revokeObjectURL(objectUrl);
+    reject(new Error('Impossible de lire cette image.'));
+  };
+  image.src = objectUrl;
+});
+
+const asciiText = (value) => String(value ?? '')
+  .normalize('NFD')
+  .replace(/[\u0300-\u036f]/g, '')
+  .replace(/[^\x20-\x7E]/g, ' ');
+
+const escapePdfText = (value) => asciiText(value)
+  .replace(/\\/g, '\\\\')
+  .replace(/\(/g, '\\(')
+  .replace(/\)/g, '\\)');
+
+const buildPdf = (lines) => {
+  const content = [
+    'BT',
+    '/F1 18 Tf',
+    '50 800 Td',
+    `(Blue Lagoon Marine) Tj`,
+    '/F1 11 Tf',
+    '0 -28 Td',
+    ...lines.flatMap((line) => [`(${escapePdfText(line)}) Tj`, '0 -18 Td']),
+    'ET',
+  ].join('\n');
+
+  const objects = [
+    '1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n',
+    '2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n',
+    '3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>\nendobj\n',
+    `4 0 obj\n<< /Length ${content.length} >>\nstream\n${content}\nendstream\nendobj\n`,
+    '5 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>\nendobj\n',
+  ];
+
+  let pdf = '%PDF-1.4\n';
+  const offsets = [0];
+  objects.forEach((object) => {
+    offsets.push(pdf.length);
+    pdf += object;
+  });
+  const xrefOffset = pdf.length;
+  pdf += `xref\n0 ${objects.length + 1}\n`;
+  pdf += '0000000000 65535 f \n';
+  offsets.slice(1).forEach((offset) => {
+    pdf += `${String(offset).padStart(10, '0')} 00000 n \n`;
+  });
+  pdf += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`;
+  return new Blob([pdf], { type: 'application/pdf' });
+};
+
+const downloadBlob = (blob, filename) => {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 0);
+};
+
+const downloadInvoicePdf = ({ reservation = {}, client = {}, boat = {}, reference, title = 'Facture' } = {}) => {
+  const ref = reference || reservation.id || `BLM-${Date.now()}`;
+  const lines = [
+    `${title} ${ref}`,
+    `Date edition: ${new Date().toLocaleDateString('fr-FR')}`,
+    '',
+    `Client: ${client.nomComplet || reservation.clientName || '-'}`,
+    `Telephone: ${client.telephone || '-'}`,
+    `Email: ${client.email || '-'}`,
+    '',
+    `Reservation: ${ref}`,
+    `Date prestation: ${fmtDate(reservation.dateDebut)}`,
+    `Bateau: ${boat.nom || reservation.bateauNom || '-'}`,
+    `Duree: ${reservation.nbHeures || reservation.nombreHeures || reservation.duration || '-'}h`,
+    `Statut: ${reservation.statut || '-'}`,
+    '',
+    `Montant total: ${money(reservation.montantTotal)}`,
+    `Montant paye: ${money(reservation.montantPaye)}`,
+    `Montant restant: ${money(reservation.montantRestant)}`,
+    '',
+    'Merci pour votre confiance.',
+  ];
+  downloadBlob(buildPdf(lines), `${asciiText(title).toLowerCase().replace(/\s+/g, '-')}-${asciiText(ref)}.pdf`);
+};
+
+
 function BrandLogo({ className = '' }) {
-  return <img className={`brand-logo ${className}`.trim()} src="img/logo.png" alt="Blue Lagoon Marine" />;
+  return <img className={`brand-logo ${className}`.trim()} src="/img/logo.png" alt="Blue Lagoon Marine" />;
 }
 
 function PublicHeader() {
@@ -108,6 +186,21 @@ function PublicHeader() {
       </nav>
     </header>
   );
+}
+
+function EmptyState({ title = 'Aucune donnée', message = 'Les informations apparaîtront ici dès qu’elles seront enregistrées.' }) {
+  return <div className="empty-state"><p><strong>{title}</strong></p><p>{message}</p></div>;
+}
+
+function BoatImage({ item, className = '', alt = '' }) {
+  const [failedSrc, setFailedSrc] = useState('');
+  const src = boatImage(item);
+
+  if (!src || failedSrc === src) {
+    return <div className={`image-placeholder ${className}`.trim()} role="img" aria-label="Aucune photo"><span>Photo</span></div>;
+  }
+
+  return <img className={className} src={src} alt={alt} onError={() => setFailedSrc(src)} />;
 }
 
 function PageIntro({ eyebrow, title, children, action }) {
@@ -131,7 +224,7 @@ function useFleetData() {
     Promise.allSettled([bateauxAPI.getAll(), clientsAPI.getAll(), reservationsAPI.getAll()])
       .then(([b, c, r]) => {
         setState({
-          boats: b.status === 'fulfilled' ? unwrap(b.value) : fallbackEquipment,
+          boats: b.status === 'fulfilled' ? unwrap(b.value) : [],
           clients: c.status === 'fulfilled' ? unwrap(c.value) : [],
           reservations: r.status === 'fulfilled' ? unwrap(r.value) : [],
           loading: false,
@@ -298,19 +391,20 @@ export function AdminDashboard() {
       <section className="dashboard-grid">
         <div className="card chart-card">
           <div className="section-head"><h2>Tendance 30 jours</h2><select defaultValue="30"><option value="30">30 jours</option><option value="7">7 jours</option></select></div>
-          <div className="trend-chart">
+          {reservations.length ? <div className="trend-chart">
             {trend.map((day) => (
               <span key={day.key} style={{ height: `${Math.max(8, Math.min(100, day.bookings * 18 + day.revenue / 500))}%` }} title={`${fmtDate(day.key)} - ${day.bookings} réservations`} />
             ))}
-          </div>
+          </div> : <EmptyState title="Aucune tendance" message="Les réservations enregistrées alimenteront ce graphique." />}
         </div>
         <div className="card chart-card">
           <h2>Répartition équipements</h2>
           <div className="donut-list">
-            {(categories.length ? categories : [['Yacht', 2], ['Voilier', 1], ['Jet Ski', 1]]).map(([label, count]) => (
+            {categories.length ? categories.map(([label, count]) => (
               <div key={label}><span>{label}</span><strong>{count}</strong></div>
-            ))}
+            )) : null}
           </div>
+          {!categories.length && <EmptyState title="Aucun équipement" message="Ajoutez des équipements pour voir la répartition." />}
         </div>
       </section>
 
@@ -321,26 +415,27 @@ export function AdminDashboard() {
             <table>
               <thead><tr><th>Heure</th><th>Client</th><th>Équipement</th><th>Durée</th><th>Statut</th><th>Montant</th></tr></thead>
               <tbody>
-                {(todays.length ? todays : reservations.slice(0, 5)).map((r) => (
+                {todays.map((r) => (
                   <tr key={r.id || `${r.clientId}-${r.dateDebut}`}>
                     <td>{fmtTime(r.dateDebut)}</td>
-                    <td>{clients.find((c) => c.id === r.clientId)?.nomComplet || 'Client'}</td>
-                    <td>{boats.find((b) => b.id === r.bateauId)?.nom || 'Équipement'}</td>
-                    <td>{r.nbHeures || 2}h</td>
-                    <td><span className={`badge ${statusBadge(r.statut)}`}>{r.statut || 'CONFIRMED'}</span></td>
+                    <td>{clients.find((c) => c.id === r.clientId)?.nomComplet || '-'}</td>
+                    <td>{boats.find((b) => b.id === r.bateauId)?.nom || '-'}</td>
+                    <td>{r.nbHeures || '-'}h</td>
+                    <td><span className={`badge ${statusBadge(r.statut)}`}>{r.statut || '-'}</span></td>
                     <td>{money(r.montantTotal)}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
+            {!todays.length && <EmptyState title="Aucune réservation aujourd’hui" message="Les réservations confirmées du jour apparaîtront ici." />}
           </div>
         </div>
         <div className="card alerts-panel">
           <h2>Alertes</h2>
-          <p><span className="badge badge-danger">{unavailable.length}</span> équipement(s) en maintenance ou retrait.</p>
-          <p><span className="badge badge-pending">{pending.length}</span> paiement(s) à relancer.</p>
-          <p><span className="badge badge-neutral">3</span> avis clients à modérer.</p>
-          <p><span className="badge badge-pending">2</span> maintenances préventives à planifier.</p>
+          {unavailable.length === 0 && pending.length === 0 ? <EmptyState title="Aucune alerte" message="Tout est à jour avec les données actuelles." /> : <>
+            {unavailable.length > 0 && <p><span className="badge badge-danger">{unavailable.length}</span> équipement(s) en maintenance ou retrait.</p>}
+            {pending.length > 0 && <p><span className="badge badge-pending">{pending.length}</span> paiement(s) à relancer.</p>}
+          </>}
         </div>
       </section>
     </div>
@@ -356,8 +451,8 @@ export function AdminFleet() {
   const [drawer, setDrawer] = useState(null);
   const [form, setForm] = useState({});
 
-  const categories = ['ALL', ...new Set((boats.length ? boats : fallbackEquipment).map((b) => b.type || 'Autre'))];
-  const filtered = (boats.length ? boats : fallbackEquipment).filter((boat) => {
+  const categories = ['ALL', ...new Set(boats.map((b) => b.type || 'Autre'))];
+  const filtered = boats.filter((boat) => {
     const text = `${boat.nom} ${boat.type} ${boat.marque || ''}`.toLowerCase();
     const matchesQuery = text.includes(query.toLowerCase());
     const matchesCategory = category === 'ALL' || boat.type === category;
@@ -375,8 +470,10 @@ export function AdminFleet() {
       puissance: boat.puissance || '',
       prixParHeure: boat.prixParHeure || '',
       disponible: boat.disponible !== false,
-      permis: boat.permis || 'Selon catégorie',
+      permis: boat.permis || '',
       description: boat.description || '',
+      statut: boat.statut || (boat.disponible === false ? 'HORS_SERVICE' : 'ACTIVE'),
+      imageUrl: boat.imageUrl || '',
     });
     setDrawer(boat.id ? boat : { id: null });
   };
@@ -387,14 +484,27 @@ export function AdminFleet() {
       capaciteMax: Number(form.capaciteMax || 0),
       prixParHeure: Number(form.prixParHeure || 0),
       disponible: Boolean(form.disponible),
+      statut: form.statut || (form.disponible ? 'ACTIVE' : 'HORS_SERVICE'),
     };
     try {
       if (drawer?.id) await bateauxAPI.update(drawer.id, payload);
       else await bateauxAPI.create(payload);
       setDrawer(null);
       reload();
-    } catch {
-      setDrawer(null);
+    } catch (err) {
+      alert(err.userMessage || 'Impossible de sauvegarder cet équipement.');
+    }
+  };
+
+  const handleImageUpload = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    try {
+      const imageUrl = await readImageAsDataUrl(file);
+      setForm((prev) => ({ ...prev, imageUrl }));
+    } catch (err) {
+      alert(err.message || 'Impossible de charger cette image.');
     }
   };
 
@@ -420,7 +530,7 @@ export function AdminFleet() {
         Inventaire, disponibilité, photos, tarifs et historique technique.
       </PageIntro>
 
-      <div className="toolbar card">
+      <div className="toolbar fleet-toolbar card">
         <input placeholder="Rechercher un équipement" value={query} onChange={(e) => setQuery(e.target.value)} />
         <select value={category} onChange={(e) => setCategory(e.target.value)}>{categories.map((c) => <option key={c}>{c}</option>)}</select>
         <select value={status} onChange={(e) => setStatus(e.target.value)}><option>ALL</option><option>ACTIVE</option><option>HORS_SERVICE</option><option>RETIRE</option></select>
@@ -434,26 +544,28 @@ export function AdminFleet() {
             <tbody>
               {filtered.map((boat) => (
                 <tr key={boat.id}>
-                  <td><img className="thumb" src={heroImage} alt="" /></td>
+                  <td><BoatImage className="thumb" item={boat} /></td>
                   <td><strong>{boat.nom}</strong></td>
                   <td>{boat.type || '-'}</td>
                   <td>{boat.marque || boat.model || '-'}</td>
                   <td className="font-mono">{boat.internalId || boat.id?.slice?.(-6) || '-'}</td>
-                  <td>{boat.capaciteMax || 0}</td>
+                  <td>{boat.capaciteMax || '-'}</td>
                   <td><span className={`badge ${statusBadge(equipmentStatus(boat))}`}>{equipmentStatus(boat)}</span></td>
-                  <td>{money(boat.prixParHeure)}/h</td>
-                  <td><div className="action-row"><button onClick={() => openDrawer(boat)}>Edit</button><button>Photos</button><button>Tarifs</button><button>Tech</button><button onClick={() => retire(boat)}>Retire</button></div></td>
+                  <td>{priceLabel(boat.prixParHeure)}</td>
+                  <td><div className="action-row"><button onClick={() => openDrawer(boat)}>Gérer</button><button onClick={() => retire(boat)}>Retirer</button></div></td>
                 </tr>
               ))}
             </tbody>
           </table>
+          {!filtered.length && <EmptyState title="Aucun équipement" message="Ajoutez votre flotte depuis le bouton en haut de page." />}
         </div>
       ) : (
         <div className="equipment-grid">
+          {!filtered.length && <EmptyState title="Aucun équipement" message="Ajoutez votre flotte depuis le bouton en haut de page." />}
           {filtered.map((boat) => (
             <article className="equipment-card" key={boat.id}>
-              <img src={heroImage} alt="" />
-              <div><span className={`badge ${statusBadge(equipmentStatus(boat))}`}>{equipmentStatus(boat)}</span><h3>{boat.nom}</h3><p>{boat.type} · {boat.capaciteMax || 0} pers.</p><strong>{money(boat.prixParHeure)}/h</strong></div>
+              <BoatImage item={boat} />
+              <div><span className={`badge ${statusBadge(equipmentStatus(boat))}`}>{equipmentStatus(boat)}</span><h3>{boat.nom}</h3><p>{[boat.type, hasValue(boat.capaciteMax) ? `${boat.capaciteMax} pers.` : null].filter(Boolean).join(' · ') || 'Informations à compléter'}</p><strong>{priceLabel(boat.prixParHeure)}</strong></div>
               <button className="btn btn-secondary" onClick={() => openDrawer(boat)}>Gérer</button>
             </article>
           ))}
@@ -468,7 +580,7 @@ export function AdminFleet() {
             <div className="drawer-section"><h3>Specs techniques</h3><label>ID interne<input value={form.internalId} onChange={(e) => setForm({ ...form, internalId: e.target.value })} /></label><label>Capacité<input type="number" value={form.capaciteMax} onChange={(e) => setForm({ ...form, capaciteMax: e.target.value })} /></label><label>Puissance<input value={form.puissance} onChange={(e) => setForm({ ...form, puissance: e.target.value })} /></label></div>
             <div className="drawer-section"><h3>Usage & tarifs</h3><label>Permis requis<input value={form.permis} onChange={(e) => setForm({ ...form, permis: e.target.value })} /></label><label>Tarif de base / heure<input type="number" value={form.prixParHeure} onChange={(e) => setForm({ ...form, prixParHeure: e.target.value })} /></label><label className="check-row"><input type="checkbox" checked={form.disponible} onChange={(e) => setForm({ ...form, disponible: e.target.checked })} /> Disponible</label></div>
             <div className="drawer-section"><h3>Description commerciale</h3><textarea rows="5" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} /></div>
-            <div className="drawer-section"><h3>Galerie photos</h3><div className="photo-strip"><img src={heroImage} alt="" /><button>Définir primaire</button><button>Ajouter</button></div></div>
+            <div className="drawer-section"><h3>Galerie photos</h3><div className="photo-strip">{form.imageUrl ? <img src={form.imageUrl} alt="Aperçu équipement" /> : <div className="image-placeholder"><span>Photo</span></div>}<label className="btn btn-secondary btn-sm">Ajouter<input type="file" accept="image/*" hidden onChange={handleImageUpload} /></label>{form.imageUrl && <button type="button" onClick={() => setForm({ ...form, imageUrl: '' })}>Retirer</button>}</div></div>
             <button className="btn btn-primary" onClick={save}>Sauvegarder</button>
           </aside>
         </div>
@@ -479,12 +591,33 @@ export function AdminFleet() {
 
 export function AdminUsers() {
   const { clients, reservations } = useFleetData();
-  const [tab, setTab] = useState('personnel');
+  const [tab, setTab] = useState('accounts');
   const [query, setQuery] = useState('');
   const [selectedClient, setSelectedClient] = useState(null);
-  const currentEmail = JSON.parse(localStorage.getItem('user_profile') || '{}')?.email;
+  const [users, setUsers] = useState([]);
+  const [usersLoading, setUsersLoading] = useState(true);
+  const [notice, setNotice] = useState('');
+  const [error, setError] = useState('');
+  const [accountForm, setAccountForm] = useState({ username: '', password: '', email: '', telephone: '' });
+  const [resetTarget, setResetTarget] = useState(null);
+  const [resetPassword, setResetPassword] = useState('');
 
+  const loadUsers = useCallback(() => {
+    setUsersLoading(true);
+    usersAPI.getAll()
+      .then((res) => setUsers(unwrap(res).filter(isClientAccount)))
+      .catch((err) => setError(err.userMessage || 'Impossible de charger les comptes client.'))
+      .finally(() => setUsersLoading(false));
+  }, []);
+
+  useEffect(() => {
+    const id = window.setTimeout(loadUsers, 0);
+    return () => window.clearTimeout(id);
+  }, [loadUsers]);
+
+  const filteredUsers = users.filter((user) => `${user.username} ${user.email || ''} ${user.telephone || ''}`.toLowerCase().includes(query.toLowerCase()));
   const filteredClients = clients.filter((client) => `${client.nomComplet} ${client.email || ''} ${client.telephone || ''}`.toLowerCase().includes(query.toLowerCase()));
+
   const statsFor = (clientId) => {
     const rows = reservations.filter((r) => r.clientId === clientId);
     return {
@@ -494,32 +627,111 @@ export function AdminUsers() {
     };
   };
 
+  const usernameFromClient = (client) => {
+    const base = (client.nomComplet || client.telephone || 'client')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '.')
+      .replace(/^\.|\.$/g, '') || 'client';
+    return base.slice(0, 28);
+  };
+
+  const prepareClientAccount = (client = selectedClient) => {
+    if (!client) return;
+    setTab('accounts');
+    setNotice('');
+    setError('');
+    setAccountForm({
+      username: usernameFromClient(client),
+      password: '',
+      email: client.email || '',
+      telephone: client.telephone || '',
+    });
+  };
+
+  const createAccount = async (event) => {
+    event.preventDefault();
+    setNotice('');
+    setError('');
+    if (!accountForm.username.trim() || accountForm.password.length < 6) {
+      setError('Username et mot de passe de 6 caractères minimum sont obligatoires.');
+      return;
+    }
+    try {
+      await usersAPI.create({ ...accountForm, username: accountForm.username.trim(), roles: ['ROLE_CLIENT'] });
+      setNotice(`Compte client ${accountForm.username.trim()} créé. Il peut se connecter à /connexion.`);
+      setAccountForm({ username: '', password: '', email: '', telephone: '' });
+      loadUsers();
+    } catch (err) {
+      setError(err.userMessage || 'Impossible de créer ce compte client.');
+    }
+  };
+
+  const submitPasswordReset = async (event) => {
+    event.preventDefault();
+    if (!resetTarget || resetPassword.length < 6) return;
+    setNotice('');
+    setError('');
+    try {
+      await usersAPI.updatePassword(resetTarget.id, resetPassword);
+      setNotice(`Mot de passe mis à jour pour ${resetTarget.username}.`);
+      setResetTarget(null);
+      setResetPassword('');
+    } catch (err) {
+      setError(err.userMessage || 'Impossible de mettre à jour le mot de passe.');
+    }
+  };
+
   return (
     <div>
-      <PageIntro eyebrow="Administration" title="Utilisateurs & clients">
-        Gestion des accès du personnel, profils clients, historique et demandes RGPD.
+      <PageIntro
+        eyebrow="Administration"
+        title="Comptes clients"
+        action={<button className="btn btn-primary" onClick={() => setTab('accounts')}>+ Créer accès client</button>}
+      >
+        Créez un username et un mot de passe pour donner accès au dashboard client.
       </PageIntro>
-      <div className="tabs"><button className={tab === 'personnel' ? 'active' : ''} onClick={() => setTab('personnel')}>Personnel</button><button className={tab === 'clients' ? 'active' : ''} onClick={() => setTab('clients')}>Clients</button></div>
-      {tab === 'personnel' ? (
-        <div className="card responsive-table">
-          <table>
-            <thead><tr><th>Nom</th><th>Email</th><th>Rôles</th><th>Création</th><th>Dernière connexion</th><th>Statut</th><th>Actions</th></tr></thead>
-            <tbody>
-              {personnel.map((user) => (
+
+      {(notice || error) && <div className={`notice ${error ? 'error' : 'success'}`}>{error || notice}</div>}
+
+      <div className="tabs"><button className={tab === 'accounts' ? 'active' : ''} onClick={() => setTab('accounts')}>Accès</button><button className={tab === 'clients' ? 'active' : ''} onClick={() => setTab('clients')}>Clients</button></div>
+
+      {tab === 'accounts' ? (
+        <div className="split-grid">
+          <form className="card form-card" onSubmit={createAccount}>
+            <h2>Créer un accès client</h2>
+            <div className="form-grid">
+              <label>Username<input value={accountForm.username} onChange={(e) => setAccountForm({ ...accountForm, username: e.target.value })} placeholder="client.nom" required /></label>
+              <label>Mot de passe<input type="password" value={accountForm.password} onChange={(e) => setAccountForm({ ...accountForm, password: e.target.value })} placeholder="Minimum 6 caractères" required /></label>
+              <label>Email<input type="email" value={accountForm.email} onChange={(e) => setAccountForm({ ...accountForm, email: e.target.value })} /></label>
+              <label>Téléphone<input value={accountForm.telephone} onChange={(e) => setAccountForm({ ...accountForm, telephone: e.target.value })} /></label>
+            </div>
+            <button className="btn btn-primary" type="submit">Créer compte client</button>
+          </form>
+
+          <div className="card responsive-table">
+            <div className="section-head"><h2>Accès clients</h2><input placeholder="Rechercher" value={query} onChange={(e) => setQuery(e.target.value)} /></div>
+            {usersLoading ? <p>Chargement...</p> : <table>
+              <thead><tr><th>Username</th><th>Contact</th><th>Rôle</th><th>Création</th><th></th></tr></thead>
+              <tbody>{filteredUsers.map((user) => (
                 <tr key={user.id}>
-                  <td><strong>{user.name}</strong></td><td>{user.email}</td><td>{user.roles.join(', ')}</td><td>{fmtDate(user.createdAt)}</td><td>{fmtDate(user.lastLogin)}</td><td><span className={`badge ${statusBadge(user.status)}`}>{user.status}</span></td>
-                  <td><div className="action-row"><button>Edit</button><button>Reset</button><button>Roles</button><button disabled={currentEmail === user.email}>Disable</button></div></td>
+                  <td><strong>{user.username}</strong></td>
+                  <td>{user.email || user.telephone || '-'}</td>
+                  <td><span className="badge badge-neutral">Client</span></td>
+                  <td>{fmtDate(user.dateCreation)}</td>
+                  <td><button onClick={() => setResetTarget(user)}>Mot de passe</button></td>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              ))}</tbody>
+            </table>}
+          </div>
         </div>
       ) : (
         <div className="split-grid">
           <div className="card">
             <input placeholder="Rechercher un client" value={query} onChange={(e) => setQuery(e.target.value)} />
             <div className="client-list">
-              {(filteredClients.length ? filteredClients : [{ id: 'demo-client', nomComplet: 'Client Démo', telephone: '+212 600 000 000' }]).map((client) => {
+              {filteredClients.map((client) => {
                 const s = statsFor(client.id);
                 return (
                   <button key={client.id} onClick={() => setSelectedClient(client)}>
@@ -528,15 +740,27 @@ export function AdminUsers() {
                 );
               })}
             </div>
+            {!filteredClients.length && <EmptyState title="Aucun client" message="Les clients créés depuis la base apparaîtront ici." />}
           </div>
           <div className="card detail-card">
             <h2>{selectedClient?.nomComplet || 'Sélectionnez un client'}</h2>
-            <p>Historique réservations, paiements, avis soumis et suppression RGPD.</p>
+            <p>{selectedClient ? 'Historique, solde et accès espace client.' : 'Choisissez un client pour préparer son accès.'}</p>
             <div className="timeline">
               {reservations.filter((r) => r.clientId === selectedClient?.id).map((r) => <div key={r.id}><span>{fmtDate(r.dateDebut)}</span><strong>{money(r.montantTotal)}</strong><em>{r.statut}</em></div>)}
             </div>
-            <button className="btn btn-secondary">Demande suppression RGPD</button>
+            <button className="btn btn-primary" disabled={!selectedClient} onClick={() => prepareClientAccount()}>Préparer accès client</button>
           </div>
+        </div>
+      )}
+
+      {resetTarget && (
+        <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && setResetTarget(null)}>
+          <form className="modal" onSubmit={submitPasswordReset}>
+            <div className="section-head"><h2>Nouveau mot de passe</h2><button type="button" onClick={() => setResetTarget(null)}>Fermer</button></div>
+            <p>Compte: <strong>{resetTarget.username}</strong></p>
+            <label>Mot de passe<input type="password" value={resetPassword} onChange={(e) => setResetPassword(e.target.value)} autoFocus /></label>
+            <button className="btn btn-primary" disabled={resetPassword.length < 6}>Enregistrer</button>
+          </form>
         </div>
       )}
     </div>
@@ -552,8 +776,8 @@ export function ManagerPlanning() {
   const [draft, setDraft] = useState(null);
   const [drag, setDrag] = useState(null);
   const hours = Array.from({ length: 13 }, (_, i) => i + 8);
-  const categories = ['ALL', ...new Set((boats.length ? boats : fallbackEquipment).map((b) => b.type || 'Autre'))];
-  const equipment = (boats.length ? boats : fallbackEquipment).filter((b) => (category === 'ALL' || b.type === category) && `${b.nom} ${b.type}`.toLowerCase().includes(query.toLowerCase()));
+  const categories = ['ALL', ...new Set(boats.map((b) => b.type || 'Autre'))];
+  const equipment = boats.filter((b) => (category === 'ALL' || b.type === category) && `${b.nom} ${b.type}`.toLowerCase().includes(query.toLowerCase()));
   const dayReservations = reservations.filter((r) => dateKey(r.dateDebut) === date);
 
   useEffect(() => {
@@ -587,7 +811,7 @@ export function ManagerPlanning() {
       <PageIntro eyebrow="Manager" title="Planning interactif" action={<button className="btn btn-primary" onClick={() => setDraft({ step: 1 })}>+ Nouvelle réservation</button>}>
         Vue opérationnelle avec rafraîchissement automatique toutes les 30 secondes.
       </PageIntro>
-      <div className="toolbar card">
+      <div className="toolbar planning-toolbar card">
         <button onClick={() => moveDate(-1)}>Prev</button><input type="date" value={date} onChange={(e) => setDate(e.target.value)} /><button onClick={() => moveDate(1)}>Next</button>
         <div className="segmented"><button className={view === 'day' ? 'active' : ''} onClick={() => setView('day')}>Jour</button><button className={view === 'week' ? 'active' : ''} onClick={() => setView('week')}>Semaine</button></div>
         <select value={category} onChange={(e) => setCategory(e.target.value)}>{categories.map((c) => <option key={c}>{c}</option>)}</select>
@@ -596,6 +820,7 @@ export function ManagerPlanning() {
       <div className="planning-shell">
         <div className="card timeline-grid">
           <div className="timeline-header"><span>Équipement</span>{hours.map((h) => <span key={h}>{h}:00</span>)}</div>
+          {!equipment.length && <EmptyState title="Aucun équipement" message="Le planning sera disponible dès que la flotte est enregistrée." />}
           {equipment.map((boat) => (
             <div className="timeline-row" key={boat.id}>
               <strong>{boat.nom}<small>{boat.type}</small></strong>
@@ -603,7 +828,7 @@ export function ManagerPlanning() {
                 {hours.map((h) => <button key={h} onClick={() => setDraft({ boatId: boat.id, hour: h, step: 1 })} onDragOver={(e) => e.preventDefault()} onDrop={() => dropBooking(boat.id, h)} />)}
                 {blocksFor(boat.id).map((r) => (
                   <Link draggable onDragStart={() => setDrag(r)} to={`/manager/reservations/${r.id}`} key={r.id} className={`booking-block ${statusBadge(r.statut)}`} style={blockStyle(r)}>
-                    {clients.find((c) => c.id === r.clientId)?.nomComplet || 'Client'} · {r.nbHeures || 2}h
+                    {clients.find((c) => c.id === r.clientId)?.nomComplet || '-'} · {r.nbHeures || '-'}h
                   </Link>
                 ))}
               </div>
@@ -653,16 +878,16 @@ export function ReservationDetail() {
 
   return (
     <div>
-      <PageIntro eyebrow="Réservation" title={`Référence ${reservation.id?.slice?.(-8) || 'BLM-0001'}`}>
+      <PageIntro eyebrow="Réservation" title={`Référence ${reservation.id?.slice?.(-8) || '-'}`}>
         Détail client, service, paiements et journal d'audit.
       </PageIntro>
       <div className="detail-layout">
-        <section className="card detail-card"><h2>Client</h2><p>{client?.nomComplet || 'Client'}<br />{client?.telephone || '+212...'}</p></section>
-        <section className="card detail-card"><h2>Service</h2><p>{boat?.nom || 'Équipement'}<br />{fmtDate(reservation.dateDebut)} · {reservation.nbHeures || 2}h</p></section>
+        <section className="card detail-card"><h2>Client</h2><p>{client?.nomComplet || '-'}<br />{client?.telephone || '-'}</p></section>
+        <section className="card detail-card"><h2>Service</h2><p>{boat?.nom || '-'}<br />{fmtDate(reservation.dateDebut)} · {reservation.nbHeures || '-'}h</p></section>
         <section className="card detail-card"><h2>Tarification</h2><p>Total {money(reservation.montantTotal)}<br />Payé {money(reservation.montantPaye)}<br />Reste {money(reservation.montantRestant)}</p></section>
         <section className="card detail-card"><h2>Paiement</h2><span className={`badge ${statusBadge(status)}`}>{status}</span></section>
       </div>
-      <div className="card action-bar">{actions.map((action) => <button key={action} className="btn btn-secondary" onClick={() => action === 'Confirm' && setStatus('CONFIRMED')}>{action}</button>)}</div>
+      <div className="card action-bar">{actions.map((action) => <button key={action} className="btn btn-secondary" onClick={() => { if (action === 'Confirm') setStatus('CONFIRMED'); if (action === 'Generate Invoice') downloadInvoicePdf({ reservation: { ...reservation, statut: status }, client, boat }); }}>{action}</button>)}</div>
       <div className="card timeline"><h2>Audit timeline</h2><div><span>{fmtDate(reservation.dateDebut)}</span><strong>Réservation créée</strong><em>{status}</em></div><div><span>Aujourd'hui</span><strong>Consultation manager</strong><em>Journal</em></div></div>
     </div>
   );
@@ -678,11 +903,16 @@ function ManualBookingPage() {
 }
 
 export function CataloguePage() {
-  const [equipment, setEquipment] = useState(fallbackEquipment);
-  const [filters, setFilters] = useState({ category: 'ALL', date: todayKey(), time: '10:00', group: 2, price: 1500 });
+  const [equipment, setEquipment] = useState([]);
+  const [filters, setFilters] = useState({ category: 'ALL', date: todayKey(), time: '10:00', group: 1, price: 10000 });
   useEffect(() => { catalogueAPI.getAll().then((res) => { const rows = unwrap(res); if (rows.length) setEquipment(rows); }).catch(() => {}); }, []);
   const categories = ['ALL', ...new Set(equipment.map((item) => item.type || 'Autre'))];
-  const filtered = equipment.filter((item) => (filters.category === 'ALL' || item.type === filters.category) && Number(item.capaciteMax || 0) >= Number(filters.group) && Number(item.prixParHeure || 0) <= Number(filters.price));
+  const filtered = equipment.filter((item) => {
+    const matchesCategory = filters.category === 'ALL' || item.type === filters.category;
+    const matchesCapacity = !filters.group || !hasValue(item.capaciteMax) || Number(item.capaciteMax) >= Number(filters.group);
+    const matchesPrice = !filters.price || !hasValue(item.prixParHeure) || Number(item.prixParHeure) <= Number(filters.price);
+    return matchesCategory && matchesCapacity && matchesPrice;
+  });
 
   return (
     <div className="public-page">
@@ -697,9 +927,10 @@ export function CataloguePage() {
             <label>Date<input type="date" value={filters.date} onChange={(e) => setFilters({ ...filters, date: e.target.value })} /></label>
             <label>Heure<input type="time" value={filters.time} onChange={(e) => setFilters({ ...filters, time: e.target.value })} /></label>
             <label>Taille du groupe<input type="number" min="1" value={filters.group} onChange={(e) => setFilters({ ...filters, group: e.target.value })} /></label>
-            <label>Prix max<input type="range" min="250" max="2500" value={filters.price} onChange={(e) => setFilters({ ...filters, price: e.target.value })} /><strong>{money(filters.price)}</strong></label>
+            <label>Prix max<input type="range" min="250" max="10000" step="250" value={filters.price} onChange={(e) => setFilters({ ...filters, price: e.target.value })} /><strong>{money(filters.price)}</strong></label>
           </aside>
           <section className="equipment-grid catalogue">
+            {!filtered.length && <EmptyState title="Catalogue vide" message="Aucun équipement disponible dans la base de données." />}
             {filtered.map((item) => <EquipmentCard key={item.id} item={item} />)}
           </section>
         </div>
@@ -711,12 +942,16 @@ export function CataloguePage() {
 function EquipmentCard({ item }) {
   return (
     <article className="equipment-card">
-      <img src={heroImage} alt="" />
+      <BoatImage item={item} />
       <div>
         <span className="badge badge-neutral">{item.type || 'Équipement'}</span>
         <h3>{item.nom}</h3>
-        <p>{item.capaciteMax || 2} pers. · {item.puissance || 'Puissance selon modèle'} · ★ {item.note || '4.8'}</p>
-        <strong>À partir de {money(item.prixParHeure)}/h</strong>
+        <p>{[
+          hasValue(item.capaciteMax) ? `${item.capaciteMax} pers.` : null,
+          item.puissance || null,
+          hasValue(item.note) ? `Note ${item.note}` : null,
+        ].filter(Boolean).join(' · ') || 'Informations à compléter'}</p>
+        <strong>{priceLabel(item.prixParHeure)}</strong>
       </div>
       <div className="card-actions"><Link className="btn btn-secondary" to={`/catalogue/${item.id}`}>Détails</Link><Link className="btn btn-primary" to="/reservation/tunnel">Réserver</Link></div>
     </article>
@@ -725,21 +960,23 @@ function EquipmentCard({ item }) {
 
 export function CatalogueDetailPage() {
   const { id } = useParams();
-  const [item, setItem] = useState(fallbackEquipment.find((x) => x.id === id) || fallbackEquipment[0]);
+  const [item, setItem] = useState(null);
   useEffect(() => { if (id) catalogueAPI.getById(id).then((res) => setItem(res.data)).catch(() => {}); }, [id]);
   return (
     <div className="public-page">
       <PublicHeader />
       <main className="public-main">
-        <div className="detail-hero card">
-          <img src={heroImage} alt="" />
-          <div><span className="badge badge-neutral">{item.type}</span><h1>{item.nom}</h1><p>{item.description || 'Une expérience nautique premium avec briefing sécurité, équipement obligatoire et assistance au départ.'}</p><Link className="btn btn-primary" to="/reservation/tunnel">Choisir un créneau</Link></div>
-        </div>
-        <div className="detail-layout">
-          <div className="card detail-card"><h2>Specs techniques</h2><p>Capacité {item.capaciteMax} pers.<br />Puissance {item.puissance || 'Selon modèle'}<br />Modèle {item.marque || 'Premium'}</p></div>
-          <div className="card detail-card"><h2>Règles</h2><p>Briefing obligatoire, caution selon équipement, permis requis pour certaines catégories.</p></div>
-          <div className="card detail-card"><h2>Tarifs</h2><p>1h {money(item.prixParHeure)}<br />Demi-journée {money((item.prixParHeure || 0) * 3.5)}<br />Journée {money((item.prixParHeure || 0) * 6)}</p></div>
-        </div>
+        {!item ? <EmptyState title="Équipement introuvable" message="Aucune donnée n’est disponible pour cet équipement." /> : <>
+          <div className="detail-hero card">
+            <BoatImage item={item} />
+            <div><span className="badge badge-neutral">{item.type || 'Équipement'}</span><h1>{item.nom}</h1><p>{item.description || 'Description non renseignée.'}</p><Link className="btn btn-primary" to="/reservation/tunnel">Choisir un créneau</Link></div>
+          </div>
+          <div className="detail-layout">
+            <div className="card detail-card"><h2>Specs techniques</h2><p>Capacité {item.capaciteMax || '-'} pers.<br />Puissance {item.puissance || '-'}<br />Modèle {item.marque || '-'}</p></div>
+            <div className="card detail-card"><h2>Règles</h2><p>{item.permis || 'Règles non renseignées.'}</p></div>
+            <div className="card detail-card"><h2>Tarifs</h2><p>{hasValue(item.prixParHeure) ? <>1h {money(item.prixParHeure)}<br />Demi-journée {money(Number(item.prixParHeure) * 3.5)}<br />Journée {money(Number(item.prixParHeure) * 6)}</> : 'Tarifs non renseignés.'}</p></div>
+          </div>
+        </>}
       </main>
     </div>
   );
@@ -763,7 +1000,7 @@ export function ReservationTunnelPage() {
       <div className="public-page">
         <PublicHeader />
         <main className="public-main confirmation-page">
-          <div className="card confirmation-card"><span className="badge badge-success">Confirmée</span><h1>Réservation {reference}</h1><p>Votre reçu et les instructions pratiques sont prêts.</p><button className="btn btn-secondary">Télécharger le reçu</button><Link className="btn btn-primary" to="/compte/reservations">Voir mon compte</Link></div>
+          <div className="card confirmation-card"><span className="badge badge-success">Confirmée</span><h1>Réservation {reference}</h1><p>Votre reçu et les instructions pratiques sont prêts.</p><button className="btn btn-secondary" onClick={() => downloadInvoicePdf({ title: 'Recu', reference, reservation: { dateDebut: `${form.date}T${form.time}`, duration: form.duration, montantTotal: Number(form.duration) * 720, montantPaye: Number(form.duration) * 720, montantRestant: 0, statut: 'CONFIRMED' }, client: { nomComplet: form.name, email: form.email } })}>Télécharger le reçu</button><Link className="btn btn-primary" to="/compte/reservations">Voir mon compte</Link></div>
         </main>
       </div>
     );
@@ -787,10 +1024,12 @@ export function ReservationTunnelPage() {
 
 export function ClientAccountPage() {
   const { tab = 'reservations' } = useParams();
-  const { reservations } = useFleetData();
+  const { boats, clients, reservations } = useFleetData();
   const tabs = [['reservations', 'Mes réservations'], ['historique', 'Historique'], ['factures', 'Mes factures'], ['profil', 'Mon profil']];
   const upcoming = reservations.filter((r) => !r.dateDebut || new Date(r.dateDebut) >= new Date());
   const past = reservations.filter((r) => r.dateDebut && new Date(r.dateDebut) < new Date());
+  const clientFor = (reservation) => clients.find((client) => client.id === reservation.clientId) || {};
+  const boatFor = (reservation) => boats.find((boat) => boat.id === reservation.bateauId) || {};
 
   return (
     <div>
@@ -798,36 +1037,37 @@ export function ClientAccountPage() {
         Réservations, factures, avis et préférences de notification.
       </PageIntro>
       <div className="tabs">{tabs.map(([key, label]) => <Link className={tab === key ? 'active' : ''} to={`/compte/${key}`} key={key}>{label}</Link>)}</div>
-      {tab === 'reservations' && <div className="reservation-cards">{(upcoming.length ? upcoming : [{ id: 'demo', dateDebut: new Date(), nbHeures: 2, montantTotal: 1440, statut: 'CONFIRMED' }]).map((r) => <ReservationCard key={r.id} reservation={r} />)}</div>}
-      {tab === 'historique' && <div className="reservation-cards">{past.map((r) => <ReservationCard key={r.id} reservation={r} past />)}<div className="card review-card"><h2>Soumettre un avis</h2><textarea rows="4" placeholder="Votre retour après une prestation terminée" /><button className="btn btn-primary">Publier</button></div></div>}
-      {tab === 'factures' && <div className="card responsive-table"><table><thead><tr><th>Facture</th><th>Date</th><th>Montant</th><th></th></tr></thead><tbody>{reservations.slice(0, 6).map((r, i) => <tr key={r.id || i}><td>FAC-{i + 1}</td><td>{fmtDate(r.dateDebut)}</td><td>{money(r.montantTotal)}</td><td><button>Télécharger PDF</button></td></tr>)}</tbody></table></div>}
-      {tab === 'profil' && <div className="card form-card"><h2>Profil</h2><div className="form-grid"><label>Nom<input defaultValue="Client Blue Lagoon" /></label><label>Email<input defaultValue="client@example.com" /></label><label>Téléphone<input defaultValue="+212 600 000 000" /></label><label>Nouveau mot de passe<input type="password" /></label></div><label className="check-row"><input type="checkbox" defaultChecked /> Notifications email</label><label className="check-row"><input type="checkbox" /> Notifications SMS</label><button className="btn btn-primary">Sauvegarder</button><button className="btn btn-secondary">Demande suppression compte</button></div>}
+      {tab === 'reservations' && <div className="reservation-cards">{!upcoming.length && <EmptyState title="Aucune réservation" message="Vos prochaines réservations apparaîtront ici." />}{upcoming.map((r) => <ReservationCard key={r.id} reservation={r} client={clientFor(r)} boat={boatFor(r)} />)}</div>}
+      {tab === 'historique' && <div className="reservation-cards">{!past.length && <EmptyState title="Aucun historique" message="Les prestations terminées apparaîtront ici." />}{past.map((r) => <ReservationCard key={r.id} reservation={r} client={clientFor(r)} boat={boatFor(r)} />)}</div>}
+      {tab === 'factures' && <div className="card responsive-table"><table><thead><tr><th>Facture</th><th>Date</th><th>Montant</th><th></th></tr></thead><tbody>{reservations.map((r, i) => <tr key={r.id || i}><td>FAC-{i + 1}</td><td>{fmtDate(r.dateDebut)}</td><td>{money(r.montantTotal)}</td><td><button onClick={() => downloadInvoicePdf({ reservation: r, client: clientFor(r), boat: boatFor(r), reference: `FAC-${i + 1}` })}>Télécharger PDF</button></td></tr>)}</tbody></table>{!reservations.length && <EmptyState title="Aucune facture" message="Les factures seront disponibles après une réservation." />}</div>}
+      {tab === 'profil' && <div className="card form-card"><h2>Profil</h2><EmptyState title="Profil non chargé" message="Les informations du compte connecté apparaîtront ici quand l’API profil sera disponible." /></div>}
     </div>
   );
 }
 
-function ReservationCard({ reservation, past = false }) {
+function ReservationCard({ reservation, client = {}, boat = {} }) {
   return (
     <article className="reservation-card card">
-      <div><span className={`badge ${statusBadge(reservation.statut)}`}>{reservation.statut || 'CONFIRMED'}</span><h3>{fmtDate(reservation.dateDebut)}</h3><p>{reservation.nbHeures || 2}h · {money(reservation.montantTotal)}</p></div>
-      <div className="card-actions"><button className="btn btn-secondary">Facture</button>{past ? <button className="btn btn-primary">Avis</button> : <button className="btn btn-secondary">Calendrier</button>}<button className="btn btn-secondary">Annuler</button></div>
+      <div><span className={`badge ${statusBadge(reservation.statut)}`}>{reservation.statut || '-'}</span><h3>{fmtDate(reservation.dateDebut)}</h3><p>{reservation.nbHeures || '-'}h · {money(reservation.montantTotal)}</p></div>
+      <div className="card-actions"><button className="btn btn-secondary" onClick={() => downloadInvoicePdf({ reservation, client, boat })}>Facture</button></div>
     </article>
   );
 }
 
 export function TechFleetPage() {
   const { boats } = useFleetData();
-  const rows = boats.length ? boats : fallbackEquipment;
+  const rows = boats;
   return (
     <div>
       <PageIntro eyebrow="Technicien" title="Flotte technique">
         Suivi maintenance, indisponibilités et historique d'intervention.
       </PageIntro>
       <div className="equipment-grid">
+        {!rows.length && <EmptyState title="Aucun équipement" message="Les données techniques apparaîtront après création de la flotte." />}
         {rows.map((boat) => (
           <article className="equipment-card" key={boat.id}>
-            <img src={heroImage} alt="" />
-            <div><span className={`badge ${statusBadge(equipmentStatus(boat))}`}>{equipmentStatus(boat)}</span><h3>{boat.nom}</h3><p>Prochaine maintenance préventive dans 12 jours.</p></div>
+            <BoatImage item={boat} />
+            <div><span className={`badge ${statusBadge(equipmentStatus(boat))}`}>{equipmentStatus(boat)}</span><h3>{boat.nom}</h3><p>{boat.description || 'Aucune note technique enregistrée.'}</p></div>
             <button className="btn btn-primary">Ouvrir fiche tech</button>
           </article>
         ))}

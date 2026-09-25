@@ -83,7 +83,7 @@ export default function ForgotPassword() {
       <div className="login-card">
 
         <div className="login-brand">
-          <img className="login-brand-logo" src="img/logo.png" alt="Blue Lagoon Marine" />
+          <img className="login-brand-logo" src="/img/logo.png" alt="Blue Lagoon Marine" />
           <div className="login-brand-sub">Réinitialisation</div>
         </div>
 

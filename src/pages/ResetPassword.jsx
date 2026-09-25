@@ -135,7 +135,7 @@ export default function ResetPassword() {
       <div className="login-card">
 
         <div className="login-brand">
-          <img className="login-brand-logo" src="img/logo.png" alt="Blue Lagoon Marine" />
+          <img className="login-brand-logo" src="/img/logo.png" alt="Blue Lagoon Marine" />
           <div className="login-brand-sub">Nouveau mot de passe</div>
         </div>
 

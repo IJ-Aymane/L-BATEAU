@@ -92,7 +92,7 @@ export default function Login() {
   return (
     <div className="auth-page">
       <section className="auth-hero" aria-label="Blue Lagoon Marine">
-        <img className="auth-logo" src="img/logo.png" alt="Logo" />
+        <img className="auth-logo" src="/img/logo.png" alt="Logo" />
         <div className="auth-hero-copy">
           <span className="eyebrow">Luxury Marine</span>
           <h1>Gestion nautique premium, simple et précise.</h1>
@@ -102,7 +102,7 @@ export default function Login() {
 
       <section className="auth-panel">
         <div className="auth-card login-only-card">
-          <img className="auth-panel-logo" src="img/logo.png" alt="Logo" />
+          <img className="auth-panel-logo" src="/img/logo.png" alt="Logo" />
           <div className="auth-card-heading">
             <span className="eyebrow">Connexion</span>
             <h2>Accès sécurisé</h2>

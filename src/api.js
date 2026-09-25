@@ -110,6 +110,13 @@ export const clientsAPI = {
   delete:  (id)         => api.delete(`/clients/${id}`),
 };
 
+
+export const usersAPI = {
+  getAll: () => api.get('/admin/users'),
+  create: (data) => api.post('/admin/users', data),
+  updatePassword: (id, password) => api.put(`/admin/users/${id}/password`, { password }),
+};
+
 export const reservationsAPI = {
   getAll:      ()             => api.get('/reservations'),
   getById:     (id)           => api.get(`/reservations/${id}`),

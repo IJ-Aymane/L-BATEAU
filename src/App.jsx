@@ -1,8 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Navigate, NavLink, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
-import Bateaux from './pages/Bateaux';
-import Clients from './pages/Clients';
-import Reservations from './pages/Reservations';
 import Login from './pages/Login';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
@@ -39,20 +36,16 @@ const nav = [
   { to: '/admin/utilisateurs', label: 'Utilisateurs', icon: 'US', roles: ['ADMIN'] },
   { to: '/manager/planning', label: 'Planning', icon: 'PL', roles: ['ADMIN', 'MANAGER'] },
   { to: '/manager/reservations/new', label: 'Réservation', icon: 'RS', roles: ['ADMIN', 'MANAGER'] },
-  { to: '/tech/flotte', label: 'Tech flotte', icon: 'TC', roles: ['ADMIN', 'TECHNICIAN'] },
-  { to: '/compte/reservations', label: 'Mon compte', icon: 'CP', roles: ['ADMIN', 'CLIENT'] },
-  { to: '/bateaux', label: 'Bateaux CRUD', icon: 'BT', roles: ['ADMIN'] },
-  { to: '/clients', label: 'Clients CRUD', icon: 'CL', roles: ['ADMIN'] },
-  { to: '/reservations', label: 'Résas CRUD', icon: 'RC', roles: ['ADMIN', 'MANAGER'] },
+  { to: '/compte/reservations', label: 'Mon compte', icon: 'CP', roles: ['CLIENT'] },
 ];
 
 function BrandLogo({ className = '' }) {
-  return <img className={`brand-logo ${className}`.trim()} src="img/logo.png" alt="Blue Lagoon Marine" />;
+  return <img className={`brand-logo ${className}`.trim()} src="/img/logo.png" alt="Blue Lagoon Marine" />;
 }
 
 function canSee(item, role) {
   if (!item.roles?.length) return true;
-  return role === 'ADMIN' || item.roles.map(normalizeRole).includes(role);
+  return item.roles.map(normalizeRole).includes(role);
 }
 
 function ShelllessRoutes() {
@@ -145,9 +138,9 @@ export default function App() {
           <Route path="/tech" element={<Navigate to="/tech/flotte" replace />} />
           <Route path="/compte" element={<Navigate to="/compte/reservations" replace />} />
           <Route path="/compte/:tab" element={<PrivateRoute roles={['ADMIN', 'CLIENT']}><ClientAccountPage /></PrivateRoute>} />
-          <Route path="/bateaux" element={<PrivateRoute roles={['ADMIN']}><Bateaux /></PrivateRoute>} />
-          <Route path="/clients" element={<PrivateRoute roles={['ADMIN']}><Clients /></PrivateRoute>} />
-          <Route path="/reservations" element={<PrivateRoute roles={['ADMIN', 'MANAGER']}><Reservations /></PrivateRoute>} />
+          <Route path="/bateaux" element={<Navigate to="/admin/flotte" replace />} />
+          <Route path="/clients" element={<Navigate to="/admin/utilisateurs" replace />} />
+          <Route path="/reservations" element={<Navigate to="/manager/planning" replace />} />
           <Route path="*" element={<Navigate to={getRoleHome(role)} replace />} />
         </Routes>
       </main>
