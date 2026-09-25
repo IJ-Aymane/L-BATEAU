@@ -82,6 +82,9 @@ export const authAPI = {
   login: (username, password) =>
     authAxios.post('/auth/login', { username, password }),
 
+  register: (data) =>
+    authAxios.post('/auth/register', data),
+
   forgotPassword: (emailOrPhone) =>
     authAxios.post('/auth/forgot-password', { emailOrPhone }),
 

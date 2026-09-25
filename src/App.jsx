@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Navigate, NavLink, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
-import Login from './pages/Login';
+import Login, { RegisterPage } from './pages/Login';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
 import PrivateRoute from './components/PrivateRoute';
@@ -25,6 +25,8 @@ const shelllessRoutes = [
   '/',
   '/login',
   '/connexion',
+  '/creer-compte',
+  '/register',
   '/forgot-password',
   '/reset-password',
   '/contact',
@@ -56,6 +58,8 @@ function ShelllessRoutes() {
       <Route path="/" element={<HomePage />} />
       <Route path="/login" element={<Login />} />
       <Route path="/connexion" element={<Login />} />
+      <Route path="/creer-compte" element={<RegisterPage />} />
+      <Route path="/register" element={<RegisterPage />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/contact" element={<ContactPage />} />

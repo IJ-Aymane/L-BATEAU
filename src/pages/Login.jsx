@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { authAPI } from '../api';
 import { extractRole, getRoleHome, saveSession } from '../auth';
 
@@ -170,6 +170,8 @@ export default function Login() {
               {loading ? 'Connexion...' : 'Se connecter'}
             </button>
           </form>
+
+          <p className="auth-switch">Pas encore de compte ? <Link to="/creer-compte">Créer un compte client</Link></p>
         </div>
       </section>
 
@@ -189,6 +191,136 @@ export default function Login() {
           </form>
         </div>
       )}
+    </div>
+  );
+}
+
+
+export function RegisterPage() {
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const rawRedirect = searchParams.get('redirect') || '/reservation/tunnel';
+  const redirectTo = rawRedirect.startsWith('/') ? rawRedirect : '/reservation/tunnel';
+  const [form, setForm] = useState({ username: '', email: '', telephone: '', password: '', confirm: '', remember: true });
+  const [touched, setTouched] = useState({});
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const errors = {
+    username: form.username.trim() ? '' : 'Nom d\'utilisateur requis.',
+    password: form.password.length >= 6 ? '' : 'Minimum 6 caractères.',
+    confirm: form.confirm === form.password ? '' : 'Les mots de passe ne correspondent pas.',
+    contact: form.email.trim() || form.telephone.trim() ? '' : 'Email ou téléphone requis.',
+  };
+  const canRegister = !errors.username && !errors.password && !errors.confirm && !errors.contact;
+
+  const setField = (field, value) => {
+    setForm((prev) => ({ ...prev, [field]: value }));
+    setError('');
+  };
+  const touch = (field) => setTouched((prev) => ({ ...prev, [field]: true }));
+
+  const handleRegister = async (event) => {
+    event.preventDefault();
+    setTouched({ username: true, password: true, confirm: true, contact: true });
+    if (!canRegister) return;
+
+    setLoading(true);
+    setError('');
+    try {
+      const res = await authAPI.register({
+        username: form.username.trim(),
+        password: form.password,
+        email: form.email.trim(),
+        telephone: form.telephone.trim(),
+      });
+      const payload = res.data || {};
+      const token = payload.token || payload.jwt || payload.accessToken;
+      if (!token) throw new Error('missing token');
+      const role = extractRole({ ...payload, token });
+      saveSession({
+        token,
+        role,
+        remember: form.remember,
+        user: payload.user || {
+          id: payload.id || payload.userId,
+          username: payload.username || form.username.trim(),
+          email: payload.email || form.email.trim(),
+          telephone: payload.telephone || form.telephone.trim(),
+          roles: payload.roles || ['ROLE_CLIENT'],
+          role,
+        },
+      });
+      navigate(redirectTo, { replace: true });
+    } catch (err) {
+      setError(err.userMessage || 'Impossible de créer ce compte client.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="auth-page">
+      <section className="auth-hero" aria-label="Blue Lagoon Marine">
+        <img className="auth-logo" src="/img/logo.png" alt="Logo" />
+        <div className="auth-hero-copy">
+          <span className="eyebrow">Compte client</span>
+          <h1>Créez votre accès et réservez votre bateau.</h1>
+          <p>Un compte client permet de confirmer une réservation, suivre les factures et retrouver l'historique.</p>
+        </div>
+      </section>
+
+      <section className="auth-panel">
+        <div className="auth-card register-card">
+          <img className="auth-panel-logo" src="/img/logo.png" alt="Logo" />
+          <div className="auth-card-heading">
+            <span className="eyebrow">Inscription</span>
+            <h2>Créer un compte client</h2>
+            <p>Renseignez vos informations pour continuer vers la réservation.</p>
+          </div>
+
+          {error && <div className="notice error" role="alert">{error}</div>}
+
+          <form className="auth-form" onSubmit={handleRegister} noValidate>
+            <label>Nom d'utilisateur
+              <input value={form.username} onChange={(event) => setField('username', event.target.value)} onBlur={() => touch('username')} autoComplete="username" autoFocus />
+              {touched.username && errors.username && <small>{errors.username}</small>}
+            </label>
+
+            <div className="form-grid two">
+              <label>Email
+                <input type="email" value={form.email} onChange={(event) => setField('email', event.target.value)} onBlur={() => touch('contact')} autoComplete="email" />
+              </label>
+              <label>Téléphone
+                <input value={form.telephone} onChange={(event) => setField('telephone', event.target.value)} onBlur={() => touch('contact')} autoComplete="tel" placeholder="06..." />
+              </label>
+            </div>
+            {touched.contact && errors.contact && <small>{errors.contact}</small>}
+
+            <div className="form-grid two">
+              <label>Mot de passe
+                <input type="password" value={form.password} onChange={(event) => setField('password', event.target.value)} onBlur={() => touch('password')} autoComplete="new-password" />
+                {touched.password && errors.password && <small>{errors.password}</small>}
+              </label>
+              <label>Confirmer
+                <input type="password" value={form.confirm} onChange={(event) => setField('confirm', event.target.value)} onBlur={() => touch('confirm')} autoComplete="new-password" />
+                {touched.confirm && errors.confirm && <small>{errors.confirm}</small>}
+              </label>
+            </div>
+
+            <label className="check-row">
+              <input type="checkbox" checked={form.remember} onChange={(event) => setField('remember', event.target.checked)} />
+              Garder ma session ouverte
+            </label>
+
+            <button className="btn btn-primary" type="submit" disabled={loading || !canRegister}>
+              {loading ? 'Création...' : 'Créer mon compte'}
+            </button>
+          </form>
+
+          <p className="auth-switch">Déjà inscrit ? <Link to="/connexion">Se connecter</Link></p>
+        </div>
+      </section>
     </div>
   );
 }

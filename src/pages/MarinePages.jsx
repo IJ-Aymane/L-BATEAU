@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import api, { bateauxAPI, catalogueAPI, clientsAPI, reservationsAPI, usersAPI } from '../api';
-import { getStoredUser } from '../auth';
+import { getStoredUser, hasValidToken } from '../auth';
 
 const faqs = [
   ['Quel est l\'âge minimum ?', 'Le conducteur doit avoir 18 ans minimum. Les passagers mineurs sont acceptés avec un adulte responsable.'],
@@ -60,6 +60,10 @@ const boatImages = (item) => {
 };
 const boatImage = (item) => boatImages(item)[0] || '';
 const priceLabel = (value) => hasValue(value) ? `${money(value)}/h` : 'Tarif non renseigné';
+const bookingPath = (suffix = '') => {
+  const destination = `/reservation/tunnel${suffix}`;
+  return hasValidToken() ? destination : `/creer-compte?redirect=${encodeURIComponent(destination)}`;
+};
 
 const readImageAsDataUrl = (file) => new Promise((resolve, reject) => {
   if (!file) {
@@ -188,6 +192,7 @@ function PublicHeader() {
         <Link to="/">Accueil</Link>
         <Link to="/catalogue">Catalogue</Link>
         <Link to="/contact">Contact</Link>
+        <Link to="/creer-compte">Créer compte</Link>
         <Link className="btn btn-primary btn-sm" to="/connexion">Se connecter</Link>
       </nav>
     </header>
@@ -207,6 +212,45 @@ function BoatImage({ item, className = '', alt = '' }) {
   }
 
   return <img className={className} src={src} alt={alt} onError={() => setFailedSrc(src)} />;
+}
+
+function BoatGallery({ item }) {
+  const images = boatImages(item);
+  const [active, setActive] = useState(0);
+  const [failed, setFailed] = useState(new Set());
+  const visibleImages = images.filter((src) => !failed.has(src));
+  const currentIndex = visibleImages.length ? Math.min(active, visibleImages.length - 1) : 0;
+  const current = visibleImages[currentIndex];
+
+  const markFailed = (src) => setFailed((prev) => new Set([...prev, src]));
+  const go = (direction) => {
+    if (!visibleImages.length) return;
+    setActive((prev) => (prev + direction + visibleImages.length) % visibleImages.length);
+  };
+
+  if (!current) {
+    return <div className="boat-gallery"><div className="image-placeholder"><span>Photo</span></div></div>;
+  }
+
+  return (
+    <div className="boat-gallery">
+      <div className="boat-gallery-main">
+        <img src={current} alt={`${item?.nom || 'Bateau'} photo ${currentIndex + 1}`} onError={() => markFailed(current)} />
+        {visibleImages.length > 1 && <span>{currentIndex + 1}/{visibleImages.length}</span>}
+        {visibleImages.length > 1 && <button type="button" className="gallery-prev" onClick={() => go(-1)} aria-label="Photo précédente">‹</button>}
+        {visibleImages.length > 1 && <button type="button" className="gallery-next" onClick={() => go(1)} aria-label="Photo suivante">›</button>}
+      </div>
+      {visibleImages.length > 1 && (
+        <div className="boat-gallery-thumbs" aria-label="Photos du bateau">
+          {visibleImages.map((src, index) => (
+            <button type="button" key={`${src}-${index}`} className={index === currentIndex ? 'active' : ''} onClick={() => setActive(index)}>
+              <img src={src} alt={`${item?.nom || 'Bateau'} miniature ${index + 1}`} onError={() => markFailed(src)} />
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
 
 function PageIntro({ eyebrow, title, children, action }) {
@@ -264,7 +308,7 @@ export function HomePage() {
           <h1>Location de bateaux, réservations et aventures en mer.</h1>
           <p>Une expérience nautique propre, rapide et élégante: flotte, créneaux, factures et accès client dans un seul espace.</p>
           <div className="home-actions">
-            <Link className="btn btn-primary" to="/connexion">Se connecter</Link>
+            <Link className="btn btn-primary" to={bookingPath()}>Réserver maintenant</Link>
             <Link className="btn btn-secondary" to="/catalogue">Voir les bateaux</Link>
           </div>
         </div>
@@ -293,7 +337,7 @@ export function HomePage() {
             <span className="eyebrow">Expérience</span>
             <h2>Mer, bateau, planning et facture dans le même flux.</h2>
             <p>Le client choisit son bateau et son horaire. L'équipe garde la main sur les réservations manuelles, l'avance, le reste à payer et l'impression de facture.</p>
-            <Link className="btn btn-primary" to="/reservation/tunnel">Réserver maintenant</Link>
+            <Link className="btn btn-primary" to={bookingPath()}>Créer un compte et réserver</Link>
           </div>
           <video controls poster="/img/auth-hero.png">
             <source src="https://videos.pexels.com/video-files/3571264/3571264-hd_1920_1080_30fps.mp4" type="video/mp4" />
@@ -352,21 +396,19 @@ export function ContactPage() {
         <section className="contact-grid">
           <div className="contact-panel">
             <h2>Blue Lagoon Marine</h2>
-            <div className="contact-detail"><span>Adresse</span><strong>Base navale, Marina de Casablanca</strong></div>
-            <div className="contact-detail"><span>Téléphone</span><strong>+212 5 22 00 00 00</strong></div>
-            <div className="contact-detail"><span>Email</span><strong>contact@bluelagoon.ma</strong></div>
-            <div className="contact-detail"><span>Horaires</span><strong>09:00 - 19:00, 7j/7</strong></div>
+            <div className="contact-detail"><span>Adresse</span><strong>Marina Smir M’diq 93200</strong></div>
+            <div className="contact-detail"><span>Téléphone</span><strong><a href="tel:+212647002326">0647002326</a></strong></div>
+            <div className="contact-detail"><span>Email</span><strong><a href="mailto:Yassin.abdelmalek93@gmail.com">Yassin.abdelmalek93@gmail.com</a></strong></div>
+            <div className="contact-detail"><span>Horaires</span><strong>09:00 - 03:00, 7j/7</strong></div>
             <div className="social-row">
-              <a href="https://www.instagram.com" target="_blank" rel="noreferrer">Instagram</a>
-              <a href="https://www.facebook.com" target="_blank" rel="noreferrer">Facebook</a>
-              <a href="https://www.linkedin.com" target="_blank" rel="noreferrer">LinkedIn</a>
+              <a href="https://www.instagram.com/yassinabicha.yachts?stkn=MXhzOHBhanEwc2Q3dA%3D%3D&utm_source=qr" target="_blank" rel="noreferrer">Instagram</a>
+              <a href="https://maps.app.goo.gl/5wkNuXPNYbfqtvFt8?g_st=iw" target="_blank" rel="noreferrer">Google Maps</a>
+              <a href="https://share.google/Julkvd1TaLe9EWotG" target="_blank" rel="noreferrer">Localisation</a>
             </div>
-            <div className="map-panel" aria-label="Carte de la base navale">
-              <iframe
-                title="Base navale Blue Lagoon Marine"
-                loading="lazy"
-                src="https://www.openstreetmap.org/export/embed.html?bbox=-7.637%2C33.586%2C-7.592%2C33.614&layer=mapnik"
-              />
+            <div className="map-panel map-link-panel" aria-label="Localisation Blue Lagoon Marine">
+              <span>Marina Smir M’diq</span>
+              <strong>Base de départ Blue Lagoon Marine</strong>
+              <a className="btn btn-secondary btn-sm" href="https://maps.app.goo.gl/5wkNuXPNYbfqtvFt8?g_st=iw" target="_blank" rel="noreferrer">Ouvrir l'itinéraire</a>
             </div>
           </div>
 
@@ -1150,7 +1192,7 @@ function EquipmentCard({ item }) {
         ].filter(Boolean).join(' · ') || 'Informations à compléter'}</p>
         <strong>{priceLabel(item.prixParHeure)}</strong>
       </div>
-      <div className="card-actions"><Link className="btn btn-secondary" to={`/catalogue/${item.id}`}>Détails</Link><Link className="btn btn-primary" to={`/reservation/tunnel?bateauId=${item.id}`}>Réserver</Link></div>
+      <div className="card-actions"><Link className="btn btn-secondary" to={`/catalogue/${item.id}`}>Détails</Link><Link className="btn btn-primary" to={bookingPath(`?bateauId=${item.id}`)}>Réserver</Link></div>
     </article>
   );
 }
@@ -1165,8 +1207,8 @@ export function CatalogueDetailPage() {
       <main className="public-main">
         {!item ? <EmptyState title="Équipement introuvable" message="Aucune donnée n’est disponible pour cet équipement." /> : <>
           <div className="detail-hero card">
-            <BoatImage item={item} />
-            <div><span className="badge badge-neutral">{item.type || 'Équipement'}</span><h1>{item.nom}</h1><p>{item.description || 'Description non renseignée.'}</p><Link className="btn btn-primary" to={`/reservation/tunnel?bateauId=${item.id}`}>Choisir un créneau</Link></div>
+            <BoatGallery key={item.id} item={item} />
+            <div><span className="badge badge-neutral">{item.type || 'Équipement'}</span><h1>{item.nom}</h1><p>{item.description || 'Description non renseignée.'}</p><Link className="btn btn-primary" to={bookingPath(`?bateauId=${item.id}`)}>Choisir un créneau</Link></div>
           </div>
           <div className="detail-layout">
             <div className="card detail-card"><h2>Specs techniques</h2><p>Capacité {item.capaciteMax || '-'} pers.<br />Puissance {item.puissance || '-'}<br />Modèle {item.marque || '-'}</p></div>
@@ -1241,6 +1283,8 @@ export function ReservationTunnelPage() {
     nombreHeures: 2,
     montantAvance: 0,
   });
+  const queryString = searchParams.toString();
+  const redirectTarget = `/reservation/tunnel${queryString ? `?${queryString}` : ''}`;
 
   useEffect(() => {
     setLoading(true);
@@ -1318,7 +1362,15 @@ export function ReservationTunnelPage() {
           </div>
 
           {error && <div className="notice error" role="alert">{error}</div>}
-          {!currentUser?.id && <div className="notice error">Session utilisateur incomplète. Reconnectez-vous avant de réserver.</div>}
+          {!currentUser?.id && (
+            <div className="notice error guest-booking-notice">
+              <span>Créez un compte client ou connectez-vous pour confirmer cette réservation.</span>
+              <div className="notice-actions">
+                <Link className="btn btn-primary btn-sm" to={`/creer-compte?redirect=${encodeURIComponent(redirectTarget)}`}>Créer un compte</Link>
+                <Link className="btn btn-secondary btn-sm" to="/connexion">Se connecter</Link>
+              </div>
+            </div>
+          )}
 
           <form className="form-grid" onSubmit={submit}>
             <label>Bateau

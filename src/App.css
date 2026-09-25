@@ -192,6 +192,8 @@ tr:last-child td { border-bottom: 0; }
 .login-brand-logo { height: 40px; width: auto; object-fit: contain; }
 .login-brand-sub { color: var(--text-body); font-size: .76rem; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; }
 .login-form { display: grid; gap: 14px; }
+.auth-switch { margin-top: 4px; text-align: center; color: var(--text-body); }
+.auth-switch a { color: var(--secondary); font-weight: 900; }
 
 /* Public pages */
 .public-page { min-height: 100vh; background: var(--bg-page); }
@@ -209,6 +211,10 @@ tr:last-child td { border-bottom: 0; }
 .social-row a { color: var(--secondary); font-weight: 800; }
 .map-panel { min-height: 260px; border-radius: 12px; overflow: hidden; border: 1px solid var(--border); }
 .map-panel iframe { width: 100%; height: 100%; min-height: 260px; border: 0; }
+.map-link-panel { min-height: 220px; padding: 22px; display: grid; align-content: end; gap: 8px; background: linear-gradient(135deg, rgba(15,76,92,.9), rgba(226,90,54,.78)), url('https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=900&q=80') center/cover; color: #fff; }
+.map-link-panel span { font-size: .78rem; font-weight: 900; text-transform: uppercase; }
+.map-link-panel strong { font-family: var(--font-heading); font-size: 1.8rem; line-height: 1; }
+.map-link-panel .btn { justify-self: start; margin-top: 6px; }
 .honeypot { position: absolute; left: -9999px; }
 .faq-section { margin-top: 36px; }
 .accordion { display: grid; gap: 10px; margin-top: 16px; }
@@ -222,6 +228,17 @@ tr:last-child td { border-bottom: 0; }
 .detail-hero { display: grid; grid-template-columns: 1.1fr .9fr; gap: 26px; padding: 20px; align-items: center; margin-bottom: 24px; }
 .detail-hero > img, .detail-hero > .image-placeholder { width: 100%; height: 440px; border-radius: 12px; object-fit: cover; }
 .detail-hero > div { display: grid; gap: 16px; padding-right: 14px; }
+.boat-gallery { display: grid; gap: 12px; width: 100%; }
+.boat-gallery-main { position: relative; height: 440px; overflow: hidden; border-radius: 12px; background: var(--bg-page); border: 1px solid var(--border); }
+.boat-gallery-main img, .boat-gallery > .image-placeholder { width: 100%; height: 100%; min-height: 440px; object-fit: cover; }
+.boat-gallery-main span { position: absolute; left: 12px; bottom: 12px; border-radius: 999px; padding: 6px 10px; background: rgba(15,76,92,.88); color: #fff; font-weight: 900; font-size: .78rem; }
+.boat-gallery-main button { position: absolute; top: 50%; transform: translateY(-50%); width: 42px; height: 42px; border-radius: 999px; border: 1px solid rgba(255,255,255,.7); background: rgba(255,255,255,.9); color: var(--secondary); font-size: 1.8rem; line-height: 1; cursor: pointer; box-shadow: var(--shadow); }
+.boat-gallery-main .gallery-prev { left: 12px; }
+.boat-gallery-main .gallery-next { right: 12px; }
+.boat-gallery-thumbs { display: grid; grid-template-columns: repeat(auto-fit, minmax(74px, 1fr)); gap: 8px; }
+.boat-gallery-thumbs button { height: 72px; padding: 0; border-radius: 10px; overflow: hidden; border: 2px solid transparent; background: transparent; cursor: pointer; opacity: .72; }
+.boat-gallery-thumbs button.active { border-color: var(--primary); opacity: 1; }
+.boat-gallery-thumbs img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .tunnel-layout { display: grid; grid-template-columns: minmax(0, 1fr) 330px; gap: 22px; align-items: start; }
 .wizard-card, .sticky-summary, .confirmation-card { padding: 24px; }
 .sticky-summary { position: sticky; top: 96px; display: grid; gap: 14px; }
@@ -278,6 +295,8 @@ tr:last-child td { border-bottom: 0; }
 .price-preview span, .price-preview small { color: var(--text-body); }
 .price-preview > strong { color: var(--secondary); font-family: var(--font-heading); font-size: 2rem; line-height: 1; }
 .price-preview div strong { color: var(--text-heading); font-family: var(--font-body); font-size: .95rem; line-height: 1.2; }
+.guest-booking-notice { display: grid; gap: 12px; }
+.notice-actions { display: flex; gap: 10px; flex-wrap: wrap; }
 .invoice-panel { grid-column: 1 / -1; padding: 24px; }
 .invoice-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin: 18px 0; }
 .invoice-grid > div, .invoice-total { padding: 14px; border-radius: 10px; background: var(--bg-page); }
@@ -389,6 +408,7 @@ tr:last-child td { border-bottom: 0; }
   .page-intro, .page-header, .reservation-card { align-items: stretch; flex-direction: column; }
   .metric-grid, .equipment-grid, .catalogue.equipment-grid, .home-stat-row, .home-media-grid { grid-template-columns: 1fr; }
   .home-media-grid img, .home-media-grid img:first-child { height: 240px; grid-row: auto; }
+  .boat-gallery-main, .boat-gallery-main img, .boat-gallery > .image-placeholder { height: 300px; min-height: 300px; }
   .toolbar { grid-template-columns: 1fr; }
   .form-grid.two, .form-grid { grid-template-columns: 1fr; }
   .auth-card { padding: 20px; }
