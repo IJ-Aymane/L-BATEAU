@@ -65,7 +65,7 @@ authAxios.interceptors.response.use(
     if (!err.response) {
       err.userMessage = 'Impossible de contacter le serveur. Vérifiez votre connexion.';
     } else if (status === 401 || status === 403) {
-      err.userMessage = 'Identifiants incorrects.';
+      err.userMessage = "Nom d'utilisateur ou mot de passe incorrect";
     } else if (status === 400) {
       err.userMessage = serverMsg || 'Données invalides.';
     } else if (status === 404) {
@@ -85,9 +85,6 @@ authAxios.interceptors.response.use(
 export const authAPI = {
   login: (username, password) =>
     authAxios.post('/auth/login', { username, password }),
-
-  register: (data) =>
-    authAxios.post('/auth/register', data),
 
   forgotPassword: (emailOrPhone) =>
     authAxios.post('/auth/forgot-password', { emailOrPhone }),
